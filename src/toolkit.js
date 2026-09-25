@@ -13,6 +13,18 @@ export function toolkit(root, env, rootRng, opts = {}) {
     seed: env.seed,
     meta: env.meta,
     PI: Math.PI,
+    /** Animation: loop phase 0..1 (0 for stills), current frame and frame count. */
+    time: env.time,
+    frame: env.frame,
+    frames: env.frames,
+    /** sin wave that loops: freq must be a whole number of cycles per loop. */
+    wave: (freq = 1, phase = 0) => Math.sin(2 * Math.PI * (env.time * freq + phase)),
+    /** A point going round a circle of radius r once per loop — add it to noise
+     *  coordinates to make any noise field move and come back seamlessly. */
+    loopOffset: (r = 1, freq = 1, phase = 0) => {
+      const a = 2 * Math.PI * (env.time * freq + phase);
+      return [r * Math.cos(a), r * Math.sin(a)];
+    },
     TAU: Math.PI * 2,
     /** Scene-level rng (independent from layer rngs). */
     rng: rootRng.fork('scene'),

@@ -807,14 +807,15 @@ export class Painter {
    * Distort what's on this canvas with a displacement field — refraction under
    * a water surface, heat haze, old glass. Each pixel shows the source at
    * (x - dx, y - dy). field(x, y) -> [dx, dy] in design px; if omitted, smooth
-   * noise with {amount, scale} is used. The field is evaluated every `res` px.
+   * noise with {amount, scale, shift} is used. The field is evaluated every `res` px.
    */
-  warp(field, { amount = 6, scale = 120, res = 4 } = {}) {
+  warp(field, { amount = 6, scale = 120, res = 4, shift = [0, 0] } = {}) {
     if (typeof field !== 'function') {
       const o = field ?? {};
-      ({ amount = amount, scale = scale, res = res } = o);
+      ({ amount = amount, scale = scale, res = res, shift = shift } = o);
       const rng = this.rng.fork('warp');
-      field = (x, y) => [amount * rng.noise2(x / scale, y / scale), amount * rng.noise2(x / scale + 71.3, y / scale - 19.7)];
+      const [ox, oy] = shift; // e.g. t.loopOffset(r) to animate
+      field = (x, y) => [amount * rng.noise2(x / scale + ox, y / scale + oy), amount * rng.noise2(x / scale + 71.3 + oy, y / scale - 19.7 - ox)];
     }
     const k = this.env.scale;
     const { width, height } = this.canvas;

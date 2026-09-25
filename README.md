@@ -18,6 +18,7 @@ node bin/draw.js look out/my-piece.png                   # 明度・ノタン(5�
 node bin/draw.js look out/my-piece.png --crop 700,1100,400,360   # 拡大（元画像座標のグリッド付き）
 node bin/draw.js compare a.png b.png           # 並べて比較
 node bin/draw.js seeds works/my-piece.js --count 9       # シード違いを一覧
+node bin/draw.js anim works/my-piece.js --frames 36 --fps 12 --format mp4  # 動く絵 + 確認用フィルムストリップ
 ```
 
 生成物は `out/`（git 管理外）。完成品は `gallery/` にコピーする。
@@ -100,6 +101,19 @@ export default function (t) {
 | `scope(name, fn)` | その中だけ独立した乱数。前に描いたものや道具の変更に影響されない |
 | `text(str, x, y, {size, font, align})` | `font: 'IPAGothic'` で日本語 |
 | `mark(name, x, y)` / `guide(shape, label)` | `--debug` 時だけ見える目印 |
+
+### 動く絵
+シーンは `t.time`（0→1 でひと回り）を読めば動く。静止画のときは 0。
+| | |
+|---|---|
+| `t.time` / `t.frame` / `t.frames` | ループ内の位置・コマ番号・総コマ数 |
+| `t.wave(freq, phase)` | ループする sin 波。`freq` は整数（ループ内の回数） |
+| `t.loopOffset(r, freq, phase)` | 半径 r の円をひと回りする点。ノイズの座標に足すと模様が動いて元に戻る |
+| `warp({ shift: t.loopOffset(0.6) })` | 揺らぎを動かす |
+
+`draw anim` はコマを `out/anim/<名前>/` に書き、ffmpeg で MP4 / アニメーション WebP にし、
+`out/<名前>.strip.png`（等間隔のコマを並べた確認用）も作る。動きはフィルムストリップと、
+一部を拡大したコマの並べ比較（`look --crop` → `compare`）で確かめる。
 
 ### 色
 `mix(a, b, t)`（OKLab）, `lighten / darken / saturate / shiftHue / alpha / adjust`, `jitter(c, rng)`, `ramp(stops, t)`, `oklch(l, c, h)`, `rgba(c)` / `mixRgba`（raster 用）

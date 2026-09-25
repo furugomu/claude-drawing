@@ -94,7 +94,7 @@
   /* ---- the pieces ---------------------------------------------------------------------- */
   .piece { padding-block: clamp(56px, 12vh, 140px); }
   .frame { display: block; position: relative; }
-  .frame img { display: block; width: 100%; height: auto; background: #05070e; }
+  .frame img, .frame video { display: block; width: 100%; height: auto; background: #05070e; }
   .tall .frame { width: min(100%, 640px); margin-inline: auto; }
   .meta {
     display: grid;
@@ -112,13 +112,13 @@
 
   /* each painting is revealed by its own light, spreading from the light's real coordinates */
   @media (prefers-reduced-motion: no-preference) {
-    .js .piece .frame img {
+    .js .piece .frame img, .js .piece .frame video {
       --r: -22%;
       -webkit-mask-image: radial-gradient(circle farthest-corner at var(--lx) var(--ly), #000 var(--r), transparent calc(var(--r) + 22%));
       mask-image: radial-gradient(circle farthest-corner at var(--lx) var(--ly), #000 var(--r), transparent calc(var(--r) + 22%));
       transition: --r 3.2s cubic-bezier(0.35, 0.05, 0.2, 1);
     }
-    .js .piece.lit .frame img { --r: 100%; }
+    .js .piece.lit .frame img, .js .piece.lit .frame video { --r: 100%; }
     .js .piece .frame::after {
       content: '';
       position: absolute;
@@ -259,12 +259,13 @@
 
   <article class="wrap piece" style="--lx: 45%; --ly: 56%">
     <a class="frame" href="https://raw.githubusercontent.com/furugomu/claude-drawing/main/gallery/008-kingyo.png" aria-label="金魚すくい（原寸の画像を開く）">
-      <img src="img/008-kingyo.webp" width="1600" height="1000" alt="夜店の金魚すくいの水槽を上からのぞきこんでいる。金魚が泳ぎ、水面には提灯の光が映る。その光の中に、お団子頭の大人とふたつ結びの子どもの頭の影がうっすら映っている。右下の手がポイを持っている。" loading="lazy">
+      <video src="video/008-kingyo.mp4" poster="img/008-kingyo.webp" width="1600" height="1000" muted loop playsinline preload="metadata" aria-label="夜店の金魚すくいの水槽を上からのぞきこんでいる。金魚が尾を振って泳ぎ、水面には提灯の光が揺れる。その光の中に、お団子頭の大人とふたつ結びの子どもの頭の影がうっすら映っている。右下の手がポイを持っている。"></video>
     </a>
     <div class="meta">
       <div><p class="no">No.008</p><h2>金魚すくい</h2></div>
       <div class="caption">
         <p>子どもの目で水槽をのぞきこむ。まず金魚と、水面に映る提灯の光に目が行く。よく見ると、その光の中に、のぞきこむ頭がふたつ映っている。お団子の人と、ふたつ結びの子。</p>
+        <p>はじめて動く絵にした。金魚は尾を振り、水の底の光と水面の映り込みが揺れる。3 秒でひと回りして、継ぎ目なくつながる。</p>
         <p class="light"><b>灯り</b> lanterns, reflected (720, 560)<a href="https://github.com/furugomu/claude-drawing/blob/main/works/008-kingyo.js">コード</a></p>
       </div>
     </div>
@@ -320,6 +321,11 @@
       for (const e of entries) if (e.isIntersecting) { e.target.classList.add('lit'); io.unobserve(e.target); }
     }, { threshold: 0.35 });
     pieces.forEach((p) => io.observe(p));
+    // moving pictures play only while on screen
+    const vio = new IntersectionObserver((entries) => {
+      for (const e of entries) e.isIntersecting ? e.target.play().catch(() => {}) : e.target.pause();
+    }, { threshold: 0.2 });
+    document.querySelectorAll('.frame video').forEach((v) => vio.observe(v));
   }
 </script>
 </body>

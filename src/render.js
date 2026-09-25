@@ -21,7 +21,8 @@ export async function loadScene(scenePath) {
 
 /**
  * Render a scene module to a canvas.
- * opts: {seed, scale, only: [layer names], skip: [layer names], debug}
+ * opts: {seed, scale, only: [layer names], skip: [layer names], debug,
+ *        time (0..1 loop phase), frame, frames}
  */
 export async function renderScene(mod, opts = {}) {
   const meta = { width: 1600, height: 1000, seed: 1, background: '#faf7f0', ...mod.meta };
@@ -29,7 +30,7 @@ export async function renderScene(mod, opts = {}) {
   const scale = opts.scale ?? 1;
   const W = meta.width, H = meta.height;
   const canvas = createCanvas(Math.round(W * scale), Math.round(H * scale));
-  const env = { W, H, scale, seed, marks: [], guides: [], layers: [], meta };
+  const env = { W, H, scale, seed, marks: [], guides: [], layers: [], meta, time: opts.time ?? 0, frame: opts.frame ?? 0, frames: opts.frames ?? 1 };
   const rootRng = makeRng(seed);
   const root = new Painter(canvas, env, rootRng.fork('root'));
   root.ctx.setTransform(scale, 0, 0, scale, 0, 0);

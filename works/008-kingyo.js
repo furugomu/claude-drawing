@@ -38,6 +38,17 @@ export default function (t) {
     { x: 150, y: 520, a: 2.5, len: 100, kind: 'red' },
   ].map((f, i) => ({ ...f, phase: R.range(0, 6.28), bend: R.range(0.06, 0.16) * R.sign(), depth: R.range(0.6, 1.2), seed: `fish${i}` }));
 
+  // ---- motion (t.time loops 0..1; every frequency is a whole number per loop) -------------
+  const TAU = Math.PI * 2, T = t.time;
+  /** A goldfish hovering: tail beating, drifting a little forward/back and side to side. */
+  const swim = (f) => {
+    const d = 9 * Math.sin(TAU * (T + f.phase / TAU));
+    const side = 6 * Math.sin(TAU * (T + f.phase / 3.1));
+    const a = f.a + 0.12 * Math.sin(TAU * (T + f.phase / 4));
+    return { ...f, a, phase: f.phase + TAU * T * 3, x: f.x + Math.cos(f.a) * d - Math.sin(f.a) * side, y: f.y + Math.sin(f.a) * d + Math.cos(f.a) * side };
+  };
+  const NOW = FISH.map(swim);
+
   /** Body, tail and fins of one goldfish, as shapes. */
   function fishShapes(f) {
     const dx = Math.cos(f.a), dy = Math.sin(f.a), px = -dy, py = dx;
@@ -129,15 +140,16 @@ export default function (t) {
     p.fill(rect(0, 0, W, H), linear(0, 0, 0, H, ['#1f6a8e', '#2a7ea2', '#2a7a9e']));
     // caustics: a web of light focused by the surface ripples
     const off = p.rng.range(0, 99);
+    const [cx1, cy1] = t.loopOffset(0.7), [cx2, cy2] = t.loopOffset(0.9, 1, 0.3);
     p.raster((x, y) => {
-      const n1 = 1 - Math.abs(p.rng.noise2(x * 0.011 + off, y * 0.013));
-      const n2 = 1 - Math.abs(p.rng.noise2(x * 0.017 - off, y * 0.012 + 5));
+      const n1 = 1 - Math.abs(p.rng.noise2(x * 0.011 + off + cx1, y * 0.013 + cy1));
+      const n2 = 1 - Math.abs(p.rng.noise2(x * 0.017 - off + cx2, y * 0.012 + 5 + cy2));
       const patch = 0.35 + 0.65 * (0.5 + 0.5 * p.rng.noise2(x * 0.003 + 40, y * 0.003));
       const c = (Math.pow(n1, 10) * 0.8 + Math.pow(n2, 14) * 0.6) * patch;
       return c > 0.02 ? [255, 236, 200, Math.min(1, c)] : null;
     }, { res: 3, blend: 'screen', alpha: 0.38 });
     // fish shadows on the bottom
-    p.group({ blur: 7, alpha: 0.45 }, (g) => { for (const f of FISH) fishShadow(g, f); });
+    p.group({ blur: 7, alpha: 0.45 }, (g) => { for (const f of NOW) fishShadow(g, f); });
     p.group({ blur: 10, alpha: 0.4 }, (g) => {
       g.fill(circle(BOWL.x + 20, BOWL.y + 30, BOWL.r), '#062232');
       g.fill(circle(POI.x + 14, POI.y + 22, POI.r), alpha('#062232', 0.5));
@@ -149,20 +161,20 @@ export default function (t) {
   });
 
   t.layer('fish', (p) => {
-    for (const f of FISH.slice().sort((a, b) => a.depth - b.depth).reverse()) drawFish(p, f);
+    for (const f of NOW.slice().sort((a, b) => a.depth - b.depth).reverse()) drawFish(p, f);
     // a veil of water over them
     p.with({ blend: 'source-atop' }, () => p.fill(rect(0, 0, W, H), alpha('#1a6a84', 0.18)));
   });
 
   // refraction: the surface ripples bend everything under it
-  t.layer('refract', () => t.p.warp({ amount: 5, scale: 90 }));
+  t.layer('refract', () => t.p.warp({ amount: 5, scale: 90, shift: t.loopOffset(0.6) }));
 
   // ---- things at the surface -------------------------------------------------------
   t.layer('bowl', (p) => {
     const { x, y, r } = BOWL;
     p.fill(circle(x, y, r), radial(x - 20, y - 25, r, ['#ffffff', '#e8eef4', '#b8c8d8']));
     p.fill(circle(x, y, r * 0.84), radial(x, y, r * 0.84, ['#9fd8ec', '#6fbcd8']));
-    drawFish(p, { x: x + 36, y: y - 18, a: 2.4, len: 70, kind: 'red', phase: 1.2, bend: 0.14, depth: 0.3, seed: 'caught' });
+    drawFish(p, swim({ x: x + 36, y: y - 18, a: 2.4, len: 70, kind: 'red', phase: 1.2, bend: 0.14, depth: 0.3, seed: 'caught' }));
     p.stroke(circle(x, y, r * 0.92), alpha('#ffffff', 0.7), 3);
     p.ink(t.arc(x, y, r * 0.95, 3.6, 4.6), { width: 4, color: '#ffffff', alpha: 0.9, taper: 0.5 });
   });
@@ -214,13 +226,14 @@ export default function (t) {
       });
       r.mark('child', cx, cy);
       r.mark('parent', mx, my);
-      r.warp({ amount: 7, scale: 60 });
+      r.warp({ amount: 7, scale: 60, shift: t.loopOffset(0.8, 1, 0.5) });
     });
     // specular glints where ripples catch the lantern light
     for (let i = 0; i < 140; i++) {
       const x = p.rng.range(0, W), y = p.rng.range(0, RIM_Y);
       const len = p.rng.range(3, 14);
-      p.ink(line(x, y, x + len, y + p.rng.range(-2, 2)), { width: p.rng.range(1, 2.4), color: p.rng.pick(['#ffffff', '#fff0d0', '#ffd0a0']), alpha: p.rng.range(0.3, 0.8), taper: 0.4 });
+      const twinkle = 0.5 + 0.5 * Math.sin(TAU * (T * p.rng.int(1, 3) + p.rng()));
+      p.ink(line(x, y, x + len, y + p.rng.range(-2, 2)), { width: p.rng.range(1, 2.4), color: p.rng.pick(['#ffffff', '#fff0d0', '#ffd0a0']), alpha: p.rng.range(0.3, 0.8) * twinkle, taper: 0.4 });
     }
   });
 

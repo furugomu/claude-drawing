@@ -3,7 +3,8 @@
 
 import { parseArgs } from 'node:util';
 import { existsSync } from 'node:fs';
-import { writeFile, mkdir } from 'node:fs/promises';
+import { writeFile, mkdir, rm } from 'node:fs/promises';
+import { spawnSync } from 'node:child_process';
 import path from 'node:path';
 import { loadScene, renderScene, debugOverlay, savePng } from '../src/render.js';
 import { lookSheet, lookCrop, lookCompare, contactSheet } from '../src/look.js';
@@ -21,6 +22,9 @@ const HELP = `draw — headless painting tool
   draw look <image.png> [--crop x,y,w,h] [--grid N] [--out file]
       Inspection sheet: values, notan, thumbnail. With --crop: zoomed detail
       with coordinates.  → out/look/...
+  draw anim <scene.js> [--frames 36] [--fps 12] [--scale 0.5] [--format mp4,webp] [--strip 6]
+      Render a looping animation (the scene reads t.time 0..1) → out/<name>.mp4 / .webp,
+      plus out/<name>.strip.png: evenly spaced frames side by side, to check the motion.
   draw compare <a.png> <b.png> [...]       Side-by-side → out/look/compare.png
   draw new <name> [--size WxH]              Scaffold works/<name>.js
 `;
@@ -75,6 +79,45 @@ async function cmdSeeds(args) {
   console.log(`\n✓ ${path.relative(process.cwd(), out)}`);
 }
 
+async function cmdAnim(args) {
+  const { values, positionals } = parseArgs({
+    args, allowPositionals: true,
+    options: {
+      frames: { type: 'string', default: '36' }, fps: { type: 'string', default: '12' }, scale: { type: 'string', default: '0.5' },
+      format: { type: 'string', default: 'mp4' }, strip: { type: 'string', default: '6' }, seed: { type: 'string' }, out: { type: 'string' },
+    },
+  });
+  const scene = positionals[0];
+  const name = nameOf(scene);
+  const frames = Number(values.frames), fps = Number(values.fps), scale = Number(values.scale);
+  const dir = path.join(OUT, 'anim', name);
+  await rm(dir, { recursive: true, force: true });
+  await mkdir(dir, { recursive: true });
+  const mod = await loadScene(scene);
+  const t0 = performance.now();
+  const stripEvery = Math.max(1, Math.floor(frames / Number(values.strip)));
+  const strip = [];
+  for (let i = 0; i < frames; i++) {
+    const { canvas } = await renderScene(mod, { seed: values.seed != null ? Number(values.seed) : undefined, scale, time: i / frames, frame: i, frames });
+    await savePng(canvas, path.join(dir, `frame-${String(i).padStart(4, '0')}.png`));
+    if (i % stripEvery === 0 && strip.length < Number(values.strip)) strip.push({ canvas, label: `frame ${i} (t=${(i / frames).toFixed(2)})` });
+    process.stdout.write('.');
+  }
+  console.log(` ${frames} frames in ${((performance.now() - t0) / 1000).toFixed(1)}s`);
+  const outs = [];
+  for (const fmt of list(values.format)) {
+    const out = values.out ?? path.join(OUT, `${name}.${fmt}`);
+    const codec = fmt === 'webp'
+      ? ['-c:v', 'libwebp_anim', '-loop', '0', '-quality', '82']
+      : ['-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-crf', '20', '-movflags', '+faststart'];
+    const r = spawnSync('ffmpeg', ['-y', '-loglevel', 'error', '-framerate', String(fps), '-i', path.join(dir, 'frame-%04d.png'), ...codec, out], { stdio: 'inherit' });
+    if (r.status !== 0) throw new Error(`ffmpeg failed for ${fmt}`);
+    outs.push(out);
+  }
+  const stripFile = await savePng(contactSheet(strip, { cols: 3, cellW: 500 }), path.join(OUT, `${name}.strip.png`));
+  for (const o of [...outs, stripFile]) console.log(`✓ ${path.relative(process.cwd(), o)}`);
+}
+
 async function cmdLook(args) {
   const { values, positionals } = parseArgs({
     args, allowPositionals: true,
@@ -125,7 +168,7 @@ export default function (t) {
 }
 
 const [cmd, ...rest] = process.argv.slice(2);
-const cmds = { render: cmdRender, seeds: cmdSeeds, look: cmdLook, compare: cmdCompare, new: cmdNew };
+const cmds = { render: cmdRender, seeds: cmdSeeds, anim: cmdAnim, look: cmdLook, compare: cmdCompare, new: cmdNew };
 if (!cmd || cmd === 'help' || !cmds[cmd]) {
   console.log(HELP);
 } else {

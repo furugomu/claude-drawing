@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Build web images for the GitHub Pages gallery (docs/) from gallery/*.png.
 import { loadImage, createCanvas } from '@napi-rs/canvas';
-import { readdir, mkdir, writeFile } from 'node:fs/promises';
+import { readdir, mkdir, writeFile, copyFile } from 'node:fs/promises';
 import path from 'node:path';
 
 const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..');
@@ -21,6 +21,13 @@ for (const dir of ['gallery', 'gallery/process']) {
   for (const f of (await readdir(path.join(ROOT, dir))).filter((f) => f.endsWith('.png'))) {
     await webp(path.join(ROOT, dir, f), f.replace(/\.png$/, ''));
   }
+}
+
+// animations: copy gallery/*.mp4 as-is
+await mkdir(path.join(ROOT, 'docs', 'video'), { recursive: true });
+for (const f of (await readdir(path.join(ROOT, 'gallery'))).filter((f) => f.endsWith('.mp4'))) {
+  await copyFile(path.join(ROOT, 'gallery', f), path.join(ROOT, 'docs', 'video', f));
+  console.log(`✓ docs/video/${f}`);
 }
 
 // social card: 1200x630 crop of the night train
