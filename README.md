@@ -57,6 +57,7 @@ export default function (t) {
 | `ribbon(spine, right, left)` | 左右で太さが違う帯（魚の胴・ひれ・葉） |
 | `trace(angleFn, x, y, {length})` | 流れ場に沿った線 |
 | `poisson(region, r, {rng})` | 均等にばらけた点 |
+| `perspective({horizon, cx, eye, focal})` | カメラ。`cam.at(X, Z, Y)` で地面・水面上の位置（メートル）→画面座標。`cam.place(shape, X, Z, {mirror})` で立った物とその映り込み |
 
 | 変形・問い合わせ | |
 |---|---|
@@ -90,6 +91,8 @@ export default function (t) {
 | `illuminate(x, y, r, color, {blend})` | 点光源。**既に描いたものにだけ**当たる（空間は暗いまま） |
 | `lens(shape, layer, {zoom, invert, base, blend})` | 水滴・ガラス玉。背後を反転・縮小して映す |
 | `snowcap(shape, depth)` | 上向きの縁に積もる雪 |
+| `rim(parts, angle \| [x, y], {color, width})` | 部品の集まり（人物など）のリムライト。他の部品に隠れた輪郭は除く |
+| `ripple({from, amount, wavelength})` | 描いたものを行ごとに揺らす（水面の映り込み） |
 | `branch(x, y, angle, len, width, {depth})` | 再帰的な枝。先端の点を返す |
 | `vignette(strength, {cx, cy})` / `grain(amt)` / `paper()` | 仕上げ |
 | `group(opts, fn)` / `clip(shape, fn)` / `at(x, y, {rotate, scale}, fn)` / `with(opts, fn)` | 合成・マスク・ローカル座標 |

@@ -713,6 +713,23 @@ export class Painter {
   // ---- motifs ----------------------------------------------------------------
 
   /**
+   * Rim light around a figure made of overlapping parts: each part's outline
+   * is lit where it faces the light and isn't hidden inside another part.
+   *   light: angle (directional) or [x, y] (point light)
+   *   opts: {color, width, min, alpha, maxDist, taper}
+   */
+  rim(parts, light, { color = '#ffd9a0', width = 3, min = 0.3, alpha = 0.85, maxDist = Infinity, taper = 0.35 } = {}) {
+    const list = parts instanceof Shape ? [parts] : parts;
+    for (const s of list) {
+      const exclude = list.filter((o) => o !== s);
+      const edges = Array.isArray(light)
+        ? s.facingPoint(light[0], light[1], { min, maxDist, exclude })
+        : s.facing(light, { min, exclude });
+      for (const e of edges) this.ink(e.offset(-width * 0.4), { width, color, alpha, taper });
+    }
+  }
+
+  /**
    * Snow (or anything that settles) piled on every upward-facing edge.
    * opts: {color, shade, min (how flat an edge must be, 0..1), wobble}
    */
@@ -755,6 +772,35 @@ export class Painter {
     };
     grow(x, y, angle, length, width, depth);
     return tips;
+  }
+
+  /**
+   * Ripple what's on this canvas: shift each row sideways by smooth noise,
+   * as if seen in moving water. Amplitude grows linearly from `from` (y) down.
+   * opts: {from, amount (px at the bottom), wavelength (px), streak (0..1 stretches rows vertically)}
+   */
+  ripple({ from = 0, amount = 6, wavelength = 5, grow = 1 } = {}) {
+    const k = this.env.scale;
+    const { width, height } = this.canvas;
+    const src = createCanvas(width, height);
+    src.getContext('2d').drawImage(this.canvas, 0, 0);
+    const ctx = this.ctx;
+    ctx.save();
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    const y0 = Math.max(0, Math.round(from * k));
+    ctx.clearRect(0, y0, width, height - y0);
+    const rng = this.rng.fork('ripple');
+    const off = rng.range(0, 999);
+    for (let y = y0; y < height; y++) {
+      const d = (y - y0) / Math.max(1, height - y0);
+      const Y = y / k;
+      const amp = amount * k * Math.pow(d, grow);
+      // wavelength shortens toward the horizon (farther water looks finer)
+      const wl = wavelength * (0.3 + 0.7 * d);
+      const dx = amp * (0.7 * rng.noise2(off, Y / wl) + 0.3 * rng.noise2(off + 9, Y / (wl * 0.4)));
+      ctx.drawImage(src, 0, y, width, 1, dx, y, width, 1);
+    }
+    ctx.restore();
   }
 
   // ---- pixel effects ---------------------------------------------------------

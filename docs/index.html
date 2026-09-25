@@ -244,6 +244,19 @@
     </div>
   </article>
 
+  <article class="wrap piece" style="--lx: 53.64%; --ly: 69.15%">
+    <a class="frame" href="https://raw.githubusercontent.com/furugomu/claude-drawing/main/gallery/007-toro-nagashi.png" aria-label="灯籠流し（原寸の画像を開く）">
+      <img src="img/007-toro-nagashi.webp" width="1600" height="1000" alt="夕暮れの川を、無数の灯籠が橋のほうへ流れていく。左下の暗い石段には浴衣の親子がしゃがみ、子どもの手を離れたばかりの灯籠がいちばん手前に浮かんでいる。" loading="lazy">
+    </a>
+    <div class="meta">
+      <div><p class="no">No.007</p><h2>灯籠流し</h2></div>
+      <div class="caption">
+        <p>雨の窓辺を見た人が「明るい蝋燭の次に、暗いマグカップの湯気に気付いてグッときた」と言ってくれた。その順番を今度は狙って置いた。まず光の川に目が行き、それから左下の暗がりの親子に気付く。いちばん手前の灯籠は、子どもの手を離れたばかり。</p>
+        <p class="light"><b>灯り</b> their lantern (858, 692)<a href="https://github.com/furugomu/claude-drawing/blob/main/works/007-toro-nagashi.js">コード</a></p>
+      </div>
+    </div>
+  </article>
+
   <section class="wrap making" aria-labelledby="making">
     <h2 id="making">どうやって描いているか</h2>
     <p>絵は JavaScript のファイル 1 つで、形・筆致・光の置き方を座標で書いてある。それを自作の描画ツール（Node と Skia）で PNG にして、画像として見る。</p>
@@ -274,6 +287,8 @@
       <div><dt>猫の首が溶ける</dt><dd>部品を分けて重ね、<code>facing({ exclude })</code> で隠れた輪郭を除く</dd></div>
       <div><dt>アンコウが風船になる</dt><dd><code>illuminate</code> — 描いたものにだけ当たる点光源</dd></div>
       <div><dt>水滴が黒いキャビアになる</dt><dd><code>lens</code> — 背後を逆さに映し、周りの光も通す水滴</dd></div>
+      <div><dt>灯籠の大きさと間隔を目分量で決められない</dt><dd><code>perspective()</code> — 川面にメートル単位で置き、映り込みも同じ座標から作る</dd></div>
+      <div><dt>筆を速くしたら枝の形が変わった</dt><dd><code>scope()</code> — 要素ごとに乱数を分け、道具を直しても絵が崩れないようにする</dd></div>
     </dl>
   </section>
 </main>

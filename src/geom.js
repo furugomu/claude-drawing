@@ -188,8 +188,10 @@ export class Shape {
    * Hand-drawn wobble: push points along their normals by smooth noise.
    * amount: max displacement in px; freq: wiggles per 100px.
    */
-  wobble(amount = 3, { freq = 1, rng, step = 3 } = {}) {
+  wobble(amount = 3, { freq = 1, rng, step } = {}) {
     if (!rng) throw new Error('wobble needs {rng}');
+    // default spacing: 3 units, but finer for small shapes (e.g. ones built in metres)
+    step ??= Math.min(3, this.length / 80);
     const r = this.resample(step);
     const nr = r.normals();
     const c = r.cumlen();
@@ -555,4 +557,35 @@ export function ribbon(spine, right, left = right, { step = 2 } = {}) {
     b.push([x - nx * Lf(u), y - ny * Lf(u)]);
   }
   return new Shape([...a, ...b.reverse()], true);
+}
+
+// ---- perspective ---------------------------------------------------------------
+
+/**
+ * A simple pinhole camera looking level along +Z, for placing things on a
+ * ground/water plane by real-world position (metres).
+ *   horizon: screen y of the horizon; cx: screen x of the vanishing point
+ *   eye: camera height above the ground; focal: px per metre at 1 m
+ * cam.at(X, Z, Y = 0) -> [x, y]   screen position of a point Y m above the ground
+ * cam.scale(Z)        -> px per metre at depth Z
+ * cam.depth(y)        -> Z of the ground point seen at screen y
+ * cam.ground(x0, x1, z0, z1) -> Shape of that ground rectangle
+ * cam.place(shape, X, Z, {Y, mirror}) -> an upright shape (in metres) placed in the scene
+ */
+export function perspective({ horizon, cx, eye = 1.6, focal = 1000 }) {
+  const cam = {
+    horizon, cx, eye, focal,
+    at: (X, Z, Y = 0) => [cx + (focal * X) / Z, horizon + (focal * (eye - Y)) / Z],
+    scale: (Z) => focal / Z,
+    depth: (y, Y = 0) => (focal * (eye - Y)) / (y - horizon),
+  };
+  cam.ground = (x0, x1, z0, z1, Y = 0) => new Shape([cam.at(x0, z0, Y), cam.at(x1, z0, Y), cam.at(x1, z1, Y), cam.at(x0, z1, Y)], true);
+  /**
+   * A flat, upright shape standing at (X, Z) facing the camera (tree, figure,
+   * lantern...). `shape` is in metres: x to the right, y = height above Y (up).
+   * mirror: its reflection in water at height 0.
+   */
+  cam.place = (shape, X, Z, { Y = 0, mirror = false } = {}) =>
+    shape.map(([u, v]) => cam.at(X + u, Z, mirror ? -(Y + v) : Y + v));
+  return cam;
 }
