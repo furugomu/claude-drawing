@@ -95,3 +95,13 @@ export function ramp(stops, t) {
   }
   return css(s[s.length - 1][1]);
 }
+
+/** [r, g, b, a] with rgb 0..255 and a 0..1 — for raster() fields. */
+export function rgba(color) {
+  const c = converter('rgb')(lch(color));
+  return [clamp255(c.r * 255), clamp255(c.g * 255), clamp255(c.b * 255), c.alpha ?? 1];
+}
+const clamp255 = (v) => Math.max(0, Math.min(255, v));
+
+/** Mix two [r,g,b,a] arrays linearly (fast, for per-pixel work). */
+export const mixRgba = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t, (a[3] ?? 1) + ((b[3] ?? 1) - (a[3] ?? 1)) * t];

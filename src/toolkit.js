@@ -23,14 +23,16 @@ export function toolkit(root, env, rootRng, opts = {}) {
      * Named layer: fn(p) draws into its own buffer, which is then composited.
      * opts: {alpha, blend, blur, filter, mask}
      * Each layer has its own deterministic rng (p.rng) derived from its name.
+     * Returns the layer's Painter (its .canvas can be reused, e.g. p.reflect()).
      */
     layer(name, lopts, fn) {
       if (typeof lopts === 'function') { fn = lopts; lopts = {}; }
       if (opts.only && !opts.only.includes(name)) return;
       if (opts.skip && opts.skip.includes(name)) return;
       const t0 = performance.now();
-      root.group({ ...lopts, rng: rootRng.fork(`layer:${name}`) }, fn);
+      const painter = root.group({ ...lopts, rng: rootRng.fork(`layer:${name}`) }, fn);
       env.layers.push({ name, ms: performance.now() - t0 });
+      return painter;
     },
 
     /** [fn(0), fn(1), ... fn(n-1)] */

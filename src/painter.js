@@ -4,7 +4,7 @@
 // scale is applied underneath, so scenes never care about output resolution.
 
 import { createCanvas } from '@napi-rs/canvas';
-import { Shape, clamp, lerp, smoothstep, poisson } from './geom.js';
+import { Shape, clamp, lerp, smoothstep, poisson, profile, strokeOutline } from './geom.js';
 import { trace } from './field.js';
 import { css, jitter as jitterColor, gradientStops, ramp } from './color.js';
 import { makeRng } from './random.js';
@@ -192,52 +192,8 @@ export class Painter {
 
   // ---- expressive strokes ----------------------------------------------------
 
-  /**
-   * Width profile along a stroke. Returns fn(t) -> width.
-   *   taper: number | [start, end]  fraction of length used to taper each end
-   *   pressure: fn(t) -> multiplier, or [w0, w1, ...] sampled evenly
-   */
-  static profile(width, { taper = 0.2, pressure } = {}) {
-    const [ts, te] = Array.isArray(taper) ? taper : [taper, taper];
-    const pf = typeof pressure === 'function' ? pressure
-      : Array.isArray(pressure) ? (t) => {
-        const x = clamp(t) * (pressure.length - 1), i = Math.min(pressure.length - 2, Math.floor(x));
-        return lerp(pressure[i], pressure[i + 1], x - i);
-      } : () => 1;
-    return (t) => {
-      let k = pf(t);
-      if (ts > 0) k *= Math.sin((Math.PI / 2) * Math.min(1, t / ts)) * 0.9 + 0.1 * Math.min(1, t / ts);
-      if (te > 0) k *= Math.sin((Math.PI / 2) * Math.min(1, (1 - t) / te)) * 0.9 + 0.1 * Math.min(1, (1 - t) / te);
-      return width * Math.max(0, k);
-    };
-  }
-
-  /** Outline polygon of a variable-width stroke along an open shape. */
-  static strokeOutline(shape, widthAt, step = 1.5) {
-    const r = shape.open().resample(step);
-    const nr = r.normals();
-    const n = r.pts.length;
-    const left = [], right = [];
-    for (let i = 0; i < n; i++) {
-      const t = i / (n - 1), w = widthAt(t) / 2, [x, y] = r.pts[i], [nx, ny] = nr[i];
-      left.push([x + nx * w, y + ny * w]);
-      right.push([x - nx * w, y - ny * w]);
-    }
-    const capPts = (p, nrm, w, dir) => {
-      const out = [], a0 = Math.atan2(nrm[1], nrm[0]);
-      for (let k = 1; k < 8; k++) {
-        const a = a0 + dir * (k / 8) * Math.PI;
-        out.push([p[0] + Math.cos(a) * w, p[1] + Math.sin(a) * w]);
-      }
-      return out;
-    };
-    const wEnd = widthAt(1) / 2, wStart = widthAt(0) / 2;
-    const pts = [...left];
-    if (wEnd > 0.3) pts.push(...capPts(r.pts[n - 1], nr[n - 1], wEnd, -1));
-    pts.push(...right.reverse());
-    if (wStart > 0.3) pts.push(...capPts(r.pts[0], [-nr[0][0], -nr[0][1]], wStart, -1));
-    return new Shape(pts, true);
-  }
+  static profile(width, opts) { return profile(width, opts); }
+  static strokeOutline(shape, widthAt, step) { return strokeOutline(shape, widthAt, step); }
 
   /**
    * Ink line: smooth, variable width, tapered ends. The workhorse for line art.
@@ -540,7 +496,82 @@ export class Painter {
 
   /** Soft glow: blurred copy of the shape(s). */
   glow(shapes, color, radius = 20, { alpha = 1, blend = 'screen' } = {}) {
-    this.group({ blur: radius, alpha, blend }, (g) => g.fill(shapes, color));
+    const list = shapes instanceof Shape ? [shapes] : shapes;
+    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+    for (const s of list) {
+      const b = s.bounds();
+      x0 = Math.min(x0, b.x); y0 = Math.min(y0, b.y); x1 = Math.max(x1, b.x1); y1 = Math.max(y1, b.y1);
+    }
+    this.buffered({ x: x0, y: y0, w: x1 - x0, h: y1 - y0 }, radius * 3, (b) => b.fill(shapes, color), { alpha, blend, blur: radius });
+  }
+
+  /**
+   * Procedural color field. fn(x, y) -> [r, g, b, a] (rgb 0..255, a 0..1) or
+   * null, evaluated every `res` design px and smoothly upscaled — for haze,
+   * nebulae, fog, light falloff. opts: {bounds, res, alpha, blend, blur}
+   */
+  raster(fn, { bounds, res = 4, alpha = 1, blend, blur = 0 } = {}) {
+    const b = bounds ?? { x: 0, y: 0, w: this.W, h: this.H };
+    const gw = Math.max(1, Math.ceil(b.w / res)), gh = Math.max(1, Math.ceil(b.h / res));
+    const small = createCanvas(gw, gh);
+    const sctx = small.getContext('2d');
+    const img = sctx.createImageData(gw, gh);
+    const d = img.data;
+    for (let j = 0; j < gh; j++) for (let i = 0; i < gw; i++) {
+      const c = fn(b.x + (i + 0.5) * res, b.y + (j + 0.5) * res);
+      if (!c) continue;
+      const k = (j * gw + i) * 4;
+      d[k] = c[0]; d[k + 1] = c[1]; d[k + 2] = c[2]; d[k + 3] = (c[3] ?? 1) * 255;
+    }
+    sctx.putImageData(img, 0, 0);
+    this.with({ alpha, blend, filter: blur ? `blur(${blur * this.env.scale}px)` : undefined }, () => {
+      this.ctx.imageSmoothingEnabled = true;
+      this.ctx.imageSmoothingQuality = 'high';
+      this.ctx.drawImage(small, b.x, b.y, gw * res, gh * res);
+    });
+  }
+
+  /**
+   * Water reflection: mirror `sources` (Painters or canvases, e.g. layers
+   * returned by t.layer) about the horizontal line y = axis, with ripples.
+   * opts: {ripple (px), wavelength (px), fade: [alphaAtAxis, alphaAtBottom],
+   *        depth (px the reflection reaches), blur, tint, tintAlpha, stretch}
+   */
+  reflect(sources, { axis, ripple = 3, wavelength = 7, fade = [0.75, 0.1], depth, blur = 0.8, tint, tintAlpha = 0.35, stretch = 1 } = {}) {
+    const k = this.env.scale;
+    const { width, height } = this.canvas;
+    const list = (Array.isArray(sources) ? sources : [sources]).filter(Boolean).map((s) => s.canvas ?? s);
+    // flatten sources
+    const src = createCanvas(width, height);
+    const sctx = src.getContext('2d');
+    for (const c of list) sctx.drawImage(c, 0, 0);
+    const out = createCanvas(width, height);
+    const o = out.getContext('2d');
+    const A = Math.round(axis * k);
+    const D = Math.round((depth ?? this.env.H - axis) * k);
+    const rng = this.rng.fork('reflect');
+    const off = rng.range(0, 999);
+    for (let y = 0; y < D && A + y < height; y++) {
+      const sy = Math.round(A - y / stretch);
+      if (sy < 0) break;
+      const Y = y / k;
+      const dx = ripple * k * (0.65 * rng.noise2(off, Y / wavelength) + 0.35 * rng.noise2(off + 50, Y / (wavelength * 0.37))) * (0.4 + (0.6 * y) / D);
+      o.drawImage(src, 0, sy, width, 1, dx, A + y, width, 1);
+    }
+    // fade with distance from the axis
+    o.globalCompositeOperation = 'destination-in';
+    const g = o.createLinearGradient(0, A, 0, A + D);
+    g.addColorStop(0, `rgba(0,0,0,${fade[0]})`);
+    g.addColorStop(1, `rgba(0,0,0,${fade[1]})`);
+    o.fillStyle = g;
+    o.fillRect(0, A, width, D);
+    if (tint) {
+      o.globalCompositeOperation = 'source-atop';
+      o.globalAlpha = tintAlpha;
+      o.fillStyle = css(tint);
+      o.fillRect(0, A, width, D);
+    }
+    this.composite(out, { blur });
   }
 
   // ---- pixel effects ---------------------------------------------------------

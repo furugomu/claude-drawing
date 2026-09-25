@@ -447,3 +447,61 @@ export function poisson(region, r, { rng, k = 20, max = 100000 } = {}) {
   }
   return pts;
 }
+
+// ---- width profiles & thick strokes ------------------------------------------
+
+/**
+ * Width profile along a stroke. Returns fn(t) -> width.
+ *   taper: number | [start, end]  fraction of length used to taper each end
+ *   pressure: fn(t) -> multiplier, or [w0, w1, ...] sampled evenly
+ */
+export function profile(width, { taper = 0.2, pressure } = {}) {
+  const [ts, te] = Array.isArray(taper) ? taper : [taper, taper];
+  const pf = typeof pressure === 'function' ? pressure
+    : Array.isArray(pressure) ? (t) => {
+      const x = clamp(t) * (pressure.length - 1), i = Math.min(pressure.length - 2, Math.floor(x));
+      return lerp(pressure[i], pressure[i + 1], x - i);
+    } : () => 1;
+  return (t) => {
+    let k = pf(t);
+    if (ts > 0) k *= Math.sin((Math.PI / 2) * Math.min(1, t / ts)) * 0.9 + 0.1 * Math.min(1, t / ts);
+    if (te > 0) k *= Math.sin((Math.PI / 2) * Math.min(1, (1 - t) / te)) * 0.9 + 0.1 * Math.min(1, (1 - t) / te);
+    return width * Math.max(0, k);
+  };
+}
+
+/** Outline polygon of a variable-width stroke along an open shape (round caps). */
+export function strokeOutline(shape, widthAt, step = 1.5) {
+  const r = shape.open().resample(step);
+  const nr = r.normals();
+  const n = r.pts.length;
+  const left = [], right = [];
+  for (let i = 0; i < n; i++) {
+    const t = i / (n - 1), w = widthAt(t) / 2, [x, y] = r.pts[i], [nx, ny] = nr[i];
+    left.push([x + nx * w, y + ny * w]);
+    right.push([x - nx * w, y - ny * w]);
+  }
+  const capPts = (p, nrm, w) => {
+    const out = [], a0 = Math.atan2(nrm[1], nrm[0]);
+    for (let k = 1; k < 8; k++) {
+      const a = a0 - (k / 8) * Math.PI;
+      out.push([p[0] + Math.cos(a) * w, p[1] + Math.sin(a) * w]);
+    }
+    return out;
+  };
+  const wEnd = widthAt(1) / 2, wStart = widthAt(0) / 2;
+  const pts = [...left];
+  if (wEnd > 0.3) pts.push(...capPts(r.pts[n - 1], nr[n - 1], wEnd));
+  pts.push(...right.reverse());
+  if (wStart > 0.3) pts.push(...capPts(r.pts[0], [-nr[0][0], -nr[0][1]], wStart));
+  return new Shape(pts, true);
+}
+
+/**
+ * A curve turned into a filled band (tails, branches, limbs, rivers...).
+ * width: number or fn(t) -> width. opts: {taper, pressure} as for ink.
+ */
+export function thick(shape, width, { taper = 0, pressure } = {}) {
+  const w = typeof width === 'function' ? width : profile(width, { taper, pressure });
+  return strokeOutline(shape, w, Math.max(1, (typeof width === 'number' ? width : 10) / 8));
+}
