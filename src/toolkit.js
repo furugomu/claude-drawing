@@ -27,8 +27,9 @@ export function toolkit(root, env, rootRng, opts = {}) {
      */
     layer(name, lopts, fn) {
       if (typeof lopts === 'function') { fn = lopts; lopts = {}; }
-      if (opts.only && !opts.only.includes(name)) return;
-      if (opts.skip && opts.skip.includes(name)) return;
+      const skipped = (opts.only && !opts.only.includes(name)) || (opts.skip && opts.skip.includes(name));
+      // a skipped layer is an empty painter, so layers that reuse it keep working
+      if (skipped) return root.group({ alpha: 0 }, () => {});
       const t0 = performance.now();
       const painter = root.group({ ...lopts, rng: rootRng.fork(`layer:${name}`) }, fn);
       env.layers.push({ name, ms: performance.now() - t0 });

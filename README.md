@@ -51,6 +51,7 @@ export default function (t) {
 | `blobUnion([[x,y,r],...], {blend})` | 円の滑らかな合体（メタボール）。雲・岩・動物の胴体 |
 | `contour(fn, {bounds, level})` | スカラー場の等高線 → 形の配列 |
 | `thick(curve, width \| fn(u))` | 曲線を太さのある帯に（尻尾・枝・川） |
+| `ribbon(spine, right, left)` | 左右で太さが違う帯（魚の胴・ひれ・葉） |
 | `trace(angleFn, x, y, {length})` | 流れ場に沿った線 |
 | `poisson(region, r, {rng})` | 均等にばらけた点 |
 
@@ -62,7 +63,9 @@ export default function (t) {
 | `.deform(rounds, amt, {rng})` | 水彩的なギザギザ |
 | `.offset(d)` | 法線方向に押し出し（閉図形は外向き正） |
 | `.facing(angle, {min, exclude})` | **その方向を向いている輪郭部分**（リムライト・雪・ハイライト） |
+| `.facingPoint(x, y, {min, maxDist})` | 点光源の方を向いている輪郭部分 |
 | `.where(pred)` | 条件を満たす輪郭部分 |
+| `.frames(n \| {spacing})` | 等間隔の位置＋法線（歯・棘・縫い目・葉を並べる） |
 | `.sub(t0,t1) .at(t) .frame(t) .bounds() .contains(x,y) .length .area()` | |
 
 ### 描く（Painter `p`）
@@ -80,6 +83,8 @@ export default function (t) {
 | `glow(shapes, color, radius)` | 発光 |
 | `raster(fn(x,y)→[r,g,b,a], {bounds, res})` | 手続き的な場（天の川・湯気・霧） |
 | `reflect(layers, {axis, ripple, fade})` | 水面反射 |
+| `illuminate(x, y, r, color, {blend})` | 点光源。**既に描いたものにだけ**当たる（空間は暗いまま） |
+| `lens(shape, layer, {zoom, invert, base, blend})` | 水滴・ガラス玉。背後を反転・縮小して映す |
 | `snowcap(shape, depth)` | 上向きの縁に積もる雪 |
 | `branch(x, y, angle, len, width, {depth})` | 再帰的な枝。先端の点を返す |
 | `vignette(strength, {cx, cy})` / `grain(amt)` / `paper()` | 仕上げ |
@@ -98,3 +103,6 @@ export default function (t) {
 4. **ベタ塗りは `fillPainted`/`strokes` で絵にする**。グラデーションから色を拾う筆致で画面全体の質感が揃う。
 5. **柔らかいもの（光・霧・星雲）は `raster`**。筆致や図形の重ね塗りでは塊っぽくなる。
 6. **キャラクターは部品を分けて重ねる**。頭と胴を一つのメタボールにすると首が溶ける。部品ごとに作り、`facing({exclude})` でリムライト。
+7. **光は足し算**。発光・照明は `screen` より `lighter`（加算）の方が「当たっている」感じが出る。
+8. **見えない参照レイヤー**。`t.layer('city', { alpha: 0 }, ...)` で描いておけば、画面には出さずに `lens` や `reflect` の元にできる。
+9. **おかしいと思ったら `--only` / `--skip` で切り分け**。スキップしたレイヤーは空の Painter を返すので依存レイヤーも動く。

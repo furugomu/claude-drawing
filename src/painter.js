@@ -514,6 +514,51 @@ export class Painter {
     this.composite(light, { blend });
   }
 
+  /**
+   * Lens (raindrop, glass bead, bubble): shows `source` (a layer Painter or
+   * canvas) through the shape — inverted and minified like a real droplet.
+   * opts: {zoom (field-of-view multiplier), invert, edge (dark rim 0..1),
+   *        highlight (0..1), light (angle the specular faces), caustic (0..1),
+   *        base (layer drawn un-inverted underneath, e.g. ambient light), baseAlpha,
+   *        blend (how the inverted image goes over the base, e.g. 'screen')}
+   */
+  lens(shape, source, { zoom = 3, invert = true, edge = 0.55, highlight = 0.8, light = -2.3, caustic = 0.35, base, baseAlpha = 1, blend } = {}) {
+    const src = source.canvas ?? source;
+    const b = shape.bounds();
+    const r = Math.max(b.w, b.h) / 2;
+    const m = this.ctx.getTransform();
+    const px = m.a * b.cx + m.c * b.cy + m.e, py = m.b * b.cx + m.d * b.cy + m.f;
+    this.clip(shape, () => {
+      const ctx = this.ctx;
+      ctx.save();
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      if (base) {
+        ctx.globalAlpha = baseAlpha;
+        ctx.drawImage(base.canvas ?? base, 0, 0);
+        ctx.globalAlpha = 1;
+      }
+      if (blend) ctx.globalCompositeOperation = blend;
+      const s = (invert ? -1 : 1) / zoom;
+      ctx.translate(px, py);
+      ctx.scale(s, s);
+      ctx.translate(-px, -py);
+      ctx.drawImage(src, 0, 0);
+      ctx.restore();
+      if (edge > 0) {
+        this.fill(shape, { kind: 'radial', cx: b.cx, cy: b.cy, r, fx: b.cx, fy: b.cy, r0: 0, stops: [[0, 'rgba(0,0,0,0)'], [0.55, 'rgba(0,0,0,0)'], [1, `rgba(0,0,0,${edge})`]] });
+      }
+      if (caustic > 0) {
+        // light focused through the drop pools on the side away from the light
+        const cx = b.cx - Math.cos(light) * r * 0.45, cy = b.cy - Math.sin(light) * r * 0.45;
+        this.fill(shape, { kind: 'radial', cx, cy, r: r * 0.6, fx: cx, fy: cy, r0: 0, stops: [`rgba(255,255,255,${caustic * 0.5})`, 'rgba(255,255,255,0)'] }, { blend: 'screen' });
+      }
+    });
+    if (highlight > 0 && r > 1.5) {
+      const hx = b.cx + Math.cos(light) * r * 0.5, hy = b.cy + Math.sin(light) * r * 0.5;
+      this.fill(new Shape(ellipsePts(hx, hy, Math.max(0.6, r * 0.22), Math.max(0.5, r * 0.15), light), true), `rgba(255,255,255,${highlight})`);
+    }
+  }
+
   /** Soft glow: blurred copy of the shape(s). */
   glow(shapes, color, radius = 20, { alpha = 1, blend = 'screen' } = {}) {
     const list = shapes instanceof Shape ? [shapes] : shapes;
@@ -734,4 +779,13 @@ function nearShape(shape, x, y, d) {
     if (shape.contains(x + Math.cos(a) * d, y + Math.sin(a) * d)) return true;
   }
   return false;
+}
+
+function ellipsePts(cx, cy, rx, ry, rot, n = 16) {
+  const c = Math.cos(rot), s = Math.sin(rot), pts = [];
+  for (let i = 0; i < n; i++) {
+    const a = (i / n) * Math.PI * 2, x = rx * Math.cos(a), y = ry * Math.sin(a);
+    pts.push([cx + x * c - y * s, cy + x * s + y * c]);
+  }
+  return pts;
 }

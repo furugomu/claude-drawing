@@ -2,7 +2,13 @@
 // value structure (grayscale / notan), small-size readability, zoomed crops
 // with coordinates, and side-by-side comparisons.
 
-import { createCanvas, loadImage } from '@napi-rs/canvas';
+import { createCanvas, loadImage as load } from '@napi-rs/canvas';
+import { existsSync } from 'node:fs';
+
+const loadImage = (file) => {
+  if (!existsSync(file)) throw new Error(`no such image: ${file}`);
+  return load(file);
+};
 
 function niceStep(span, target = 8) {
   const raw = span / target, p = Math.pow(10, Math.floor(Math.log10(raw)));
