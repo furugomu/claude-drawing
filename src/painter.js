@@ -803,6 +803,51 @@ export class Painter {
     ctx.restore();
   }
 
+  /**
+   * Distort what's on this canvas with a displacement field — refraction under
+   * a water surface, heat haze, old glass. Each pixel shows the source at
+   * (x - dx, y - dy). field(x, y) -> [dx, dy] in design px; if omitted, smooth
+   * noise with {amount, scale} is used. The field is evaluated every `res` px.
+   */
+  warp(field, { amount = 6, scale = 120, res = 4 } = {}) {
+    if (typeof field !== 'function') {
+      const o = field ?? {};
+      ({ amount = amount, scale = scale, res = res } = o);
+      const rng = this.rng.fork('warp');
+      field = (x, y) => [amount * rng.noise2(x / scale, y / scale), amount * rng.noise2(x / scale + 71.3, y / scale - 19.7)];
+    }
+    const k = this.env.scale;
+    const { width, height } = this.canvas;
+    const src = this.ctx.getImageData(0, 0, width, height);
+    const out = this.ctx.createImageData(width, height);
+    const S = src.data, D = out.data;
+    const step = Math.max(1, Math.round(res * k));
+    const gw = Math.ceil(width / step) + 2, gh = Math.ceil(height / step) + 2;
+    const FX = new Float32Array(gw * gh), FY = new Float32Array(gw * gh);
+    for (let j = 0; j < gh; j++) for (let i = 0; i < gw; i++) {
+      const [dx, dy] = field((i * step) / k, (j * step) / k);
+      FX[j * gw + i] = dx * k; FY[j * gw + i] = dy * k;
+    }
+    for (let y = 0; y < height; y++) {
+      const gy = y / step, j = Math.floor(gy), fy = gy - j;
+      for (let x = 0; x < width; x++) {
+        const gx = x / step, i = Math.floor(gx), fx = gx - i;
+        const a = j * gw + i;
+        const dx = (FX[a] * (1 - fx) + FX[a + 1] * fx) * (1 - fy) + (FX[a + gw] * (1 - fx) + FX[a + gw + 1] * fx) * fy;
+        const dy = (FY[a] * (1 - fx) + FY[a + 1] * fx) * (1 - fy) + (FY[a + gw] * (1 - fx) + FY[a + gw + 1] * fx) * fy;
+        // bilinear sample of the source
+        const sx = Math.min(width - 1.001, Math.max(0, x - dx)), sy = Math.min(height - 1.001, Math.max(0, y - dy));
+        const x0 = Math.floor(sx), y0 = Math.floor(sy), tx = sx - x0, ty = sy - y0;
+        const p00 = (y0 * width + x0) * 4, p10 = p00 + 4, p01 = p00 + width * 4, p11 = p01 + 4;
+        const o = (y * width + x) * 4;
+        for (let c = 0; c < 4; c++) {
+          D[o + c] = (S[p00 + c] * (1 - tx) + S[p10 + c] * tx) * (1 - ty) + (S[p01 + c] * (1 - tx) + S[p11 + c] * tx) * ty;
+        }
+      }
+    }
+    this.ctx.putImageData(out, 0, 0);
+  }
+
   // ---- pixel effects ---------------------------------------------------------
 
   /** Film/paper grain over what's on this canvas. amount ~0.02–0.1 */

@@ -93,6 +93,7 @@ export default function (t) {
 | `snowcap(shape, depth)` | 上向きの縁に積もる雪 |
 | `rim(parts, angle \| [x, y], {color, width})` | 部品の集まり（人物など）のリムライト。他の部品に隠れた輪郭は除く |
 | `ripple({from, amount, wavelength})` | 描いたものを行ごとに揺らす（水面の映り込み） |
+| `warp(fn \| {amount, scale})` | 描いたものを変位場で歪める（水面下の屈折・陽炎・古いガラス） |
 | `branch(x, y, angle, len, width, {depth})` | 再帰的な枝。先端の点を返す |
 | `vignette(strength, {cx, cy})` / `grain(amt)` / `paper()` | 仕上げ |
 | `group(opts, fn)` / `clip(shape, fn)` / `at(x, y, {rotate, scale}, fn)` / `with(opts, fn)` | 合成・マスク・ローカル座標 |
