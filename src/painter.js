@@ -494,6 +494,26 @@ export class Painter {
     }));
   }
 
+  /**
+   * A point light that only falls on what's already painted on this canvas
+   * (so empty water/sky stays dark). Use inside the layer of the lit subject.
+   * opts: {strength, blend ('screen' | 'overlay' | 'lighter' ...), falloff}
+   */
+  illuminate(x, y, radius, color, { strength = 0.8, blend = 'screen', falloff = [[0, 1], [0.35, 0.45], [1, 0]] } = {}) {
+    const { width, height } = this.canvas;
+    const light = createCanvas(width, height);
+    const lctx = light.getContext('2d');
+    lctx.setTransform(this.ctx.getTransform());
+    const g = lctx.createRadialGradient(x, y, 0, x, y, radius);
+    for (const [o, a] of falloff) g.addColorStop(o, alpha(css(color), a * strength));
+    lctx.fillStyle = g;
+    lctx.fillRect(x - radius, y - radius, radius * 2, radius * 2);
+    lctx.setTransform(1, 0, 0, 1, 0, 0);
+    lctx.globalCompositeOperation = 'destination-in';
+    lctx.drawImage(this.canvas, 0, 0);
+    this.composite(light, { blend });
+  }
+
   /** Soft glow: blurred copy of the shape(s). */
   glow(shapes, color, radius = 20, { alpha = 1, blend = 'screen' } = {}) {
     const list = shapes instanceof Shape ? [shapes] : shapes;

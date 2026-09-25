@@ -281,6 +281,35 @@ export class Shape {
     return this.where((p, [nx, ny]) => nx * dx + ny * dy > min && !ex.some((s) => s.contains(p[0], p[1])), { step, minLength });
   }
 
+  /**
+   * Outline pieces lit by a point light at (x, y): outward normal points
+   * toward the light (cosine > min) and within maxDist.
+   */
+  facingPoint(x, y, { min = 0.2, maxDist = Infinity, step = 2, minLength = 10, exclude = [] } = {}) {
+    const ex = exclude instanceof Shape ? [exclude] : exclude;
+    return this.where(([px, py], [nx, ny]) => {
+      const dx = x - px, dy = y - py, d = Math.hypot(dx, dy) || 1;
+      return d < maxDist && (nx * dx + ny * dy) / d > min && !ex.some((s) => s.contains(px, py));
+    }, { step, minLength });
+  }
+
+  /**
+   * n evenly spaced frames along the path (or every `spacing` px):
+   * [{x, y, tx, ty, nx, ny, angle, t}, ...] — for teeth, spines, leaves, stitches.
+   * For closed shapes nx/ny point outward.
+   */
+  frames(n, { spacing, from = 0, to = 1 } = {}) {
+    if (spacing) n = Math.max(1, Math.round((this.length * (to - from)) / spacing));
+    const sign = this.closed && this.area() > 0 ? -1 : 1;
+    const out = [];
+    for (let i = 0; i < n; i++) {
+      const t = from + ((to - from) * (i + 0.5)) / n;
+      const f = this.frame(t);
+      out.push({ ...f, nx: f.nx * sign, ny: f.ny * sign, t });
+    }
+    return out;
+  }
+
   /** Build a Path2D. */
   path2d(path = new Path2D()) {
     const p = this.pts;
@@ -506,4 +535,24 @@ export function strokeOutline(shape, widthAt, step = 1.5) {
 export function thick(shape, width, { taper = 0, pressure } = {}) {
   const w = typeof width === 'function' ? width : profile(width, { taper, pressure });
   return strokeOutline(shape, w, Math.max(1, (typeof width === 'number' ? width : 10) / 8));
+}
+
+/**
+ * Like thick(), but with separate widths on each side of the spine:
+ * `right(u)` on the right-hand side of travel (+normal), `left(u)` on the other.
+ * Great for fish bodies, fins, leaves, feathers.
+ */
+export function ribbon(spine, right, left = right, { step = 2 } = {}) {
+  const r = spine.open().resample(step);
+  const nr = r.normals();
+  const n = r.pts.length;
+  const R = typeof right === 'function' ? right : () => right;
+  const Lf = typeof left === 'function' ? left : () => left;
+  const a = [], b = [];
+  for (let i = 0; i < n; i++) {
+    const u = i / (n - 1), [x, y] = r.pts[i], [nx, ny] = nr[i];
+    a.push([x + nx * R(u), y + ny * R(u)]);
+    b.push([x - nx * Lf(u), y - ny * Lf(u)]);
+  }
+  return new Shape([...a, ...b.reverse()], true);
 }
