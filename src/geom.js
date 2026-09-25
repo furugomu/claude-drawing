@@ -273,10 +273,12 @@ export class Shape {
   /**
    * Outline pieces whose outward normal faces `angle` (radians; e.g. toward
    * the light). min: cosine threshold (0 = anything facing, 0.7 = squarely).
+   * exclude: shape(s) whose interior hides the outline (e.g. overlapping parts).
    */
-  facing(angle, { min = 0.3, step = 2, minLength = 10 } = {}) {
+  facing(angle, { min = 0.3, step = 2, minLength = 10, exclude = [] } = {}) {
     const dx = Math.cos(angle), dy = Math.sin(angle);
-    return this.where((p, [nx, ny]) => nx * dx + ny * dy > min, { step, minLength });
+    const ex = exclude instanceof Shape ? [exclude] : exclude;
+    return this.where((p, [nx, ny]) => nx * dx + ny * dy > min && !ex.some((s) => s.contains(p[0], p[1])), { step, minLength });
   }
 
   /** Build a Path2D. */

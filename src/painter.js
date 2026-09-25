@@ -4,9 +4,9 @@
 // scale is applied underneath, so scenes never care about output resolution.
 
 import { createCanvas } from '@napi-rs/canvas';
-import { Shape, clamp, lerp, smoothstep, poisson, profile, strokeOutline } from './geom.js';
+import { Shape, clamp, lerp, smoothstep, poisson, profile, strokeOutline, thick, curve } from './geom.js';
 import { trace } from './field.js';
-import { css, jitter as jitterColor, gradientStops, ramp } from './color.js';
+import { css, jitter as jitterColor, gradientStops, ramp, alpha } from './color.js';
 import { makeRng } from './random.js';
 
 const TAU = Math.PI * 2;
@@ -572,6 +572,64 @@ export class Painter {
       o.fillRect(0, A, width, D);
     }
     this.composite(out, { blur });
+  }
+
+  /**
+   * Darken (or tint) toward the edges to pull the eye inward.
+   * opts: {color, cx, cy (focus point, design px), inner (0..1 clear radius), blend}
+   */
+  vignette(strength = 0.35, { color = '#000', cx = this.W / 2, cy = this.H / 2, inner = 0.4, blend } = {}) {
+    const R = Math.hypot(Math.max(cx, this.W - cx), Math.max(cy, this.H - cy));
+    const c = css(color);
+    this.fill(new Shape([[-10, -10], [this.W + 10, -10], [this.W + 10, this.H + 10], [-10, this.H + 10]], true),
+      { kind: 'radial', cx, cy, r: R, fx: cx, fy: cy, r0: 0, stops: [[0, alpha(c, 0)], [inner, alpha(c, 0)], [1, alpha(c, strength)]] }, { blend });
+  }
+
+  // ---- motifs ----------------------------------------------------------------
+
+  /**
+   * Snow (or anything that settles) piled on every upward-facing edge.
+   * opts: {color, shade, min (how flat an edge must be, 0..1), wobble}
+   */
+  snowcap(shape, depth = 20, { color = '#e8eef8', shade = '#aab6cf', min = 0.55, exclude } = {}) {
+    for (const edge of shape.facing(-Math.PI / 2, { min, minLength: 8, exclude })) {
+      const cap = thick(edge.translate(0, -depth * 0.35), (u) => depth * Math.pow(Math.sin(Math.PI * u), 0.35) * this.rng.range(0.9, 1.1));
+      const b = edge.bounds();
+      this.fill(cap.wobble(depth * 0.12, { rng: this.rng, freq: 3 }), { kind: 'linear', x0: 0, y0: b.y - depth, x1: 0, y1: b.y + depth * 0.6, stops: [color, shade] });
+    }
+  }
+
+  /**
+   * A branching limb (bare tree, twig, coral, lightning...) grown recursively.
+   *   angle: radians (−π/2 = straight up); length/width of the first segment
+   *   opts: {depth, color, spread, bend, shrink, kids: [min,max], taper, draw}
+   * `draw(p, curve, width, depth)` overrides how each segment is painted.
+   * Returns the list of tip points (handy for blossoms, leaves, snow).
+   */
+  branch(x, y, angle, length, width, {
+    depth = 4, color = '#1a1410', spread = 0.9, bend = 0.25, shrink = 0.6, kids = [2, 3], lift = -0.25, draw,
+  } = {}) {
+    const rng = this.rng, tips = [];
+    const grow = (x, y, ang, len, w, d) => {
+      const bd = rng.gauss(0, bend);
+      const pts = [];
+      for (let i = 0; i < 5; i++) {
+        const u = i / 4, a = ang + bd * u;
+        pts.push([x + Math.cos(a) * len * u + rng.gauss(0, len * 0.02), y + Math.sin(a) * len * u + rng.gauss(0, len * 0.02)]);
+      }
+      const c = curve(pts);
+      if (draw) draw(this, c, w, d);
+      else this.ink(c, { width: w, color, taper: [0, 0.25], pressure: [1, 0.8, 0.6] });
+      if (d <= 0 || w < 1.2) { tips.push(pts[4]); return; }
+      const n = rng.int(kids[0], kids[1]);
+      for (let k = 0; k < n; k++) {
+        const [sx, sy] = c.at(0.45 + 0.55 * rng());
+        grow(sx, sy, ang + bd + rng.range(-spread, spread) + lift * Math.sign(Math.cos(ang)), len * rng.range(0.45, 0.7), w * shrink, d - 1);
+      }
+      grow(pts[4][0], pts[4][1], ang + bd + rng.gauss(0, 0.2), len * 0.7, w * 0.7, d - 1);
+    };
+    grow(x, y, angle, length, width, depth);
+    return tips;
   }
 
   // ---- pixel effects ---------------------------------------------------------
