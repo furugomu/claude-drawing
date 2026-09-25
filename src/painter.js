@@ -3,7 +3,7 @@
 // Coordinates are always "design pixels" (meta.width x meta.height); the render
 // scale is applied underneath, so scenes never care about output resolution.
 
-import { createCanvas } from '@napi-rs/canvas';
+import { createCanvas, Path2D } from '@napi-rs/canvas';
 import { Shape, clamp, lerp, smoothstep, poisson, profile, strokeOutline, thick, curve } from './geom.js';
 import { trace } from './field.js';
 import { css, jitter as jitterColor, gradientStops, ramp, alpha } from './color.js';
@@ -78,6 +78,17 @@ export class Painter {
       ctx.shadowOffsetY = (s.y ?? 0) * k;
     }
     try { return fn(this); } finally { ctx.restore(); }
+  }
+
+  /**
+   * Run fn with its own random sequence, derived from the layer seed + name.
+   * What's drawn inside no longer depends on how much randomness earlier
+   * drawing consumed — so tweaking one element (or a tool) can't reshuffle it.
+   */
+  scope(name, fn) {
+    const saved = this.rng;
+    this.rng = saved.fork(name);
+    try { return fn(this); } finally { this.rng = saved; }
   }
 
   /** Draw in a local coordinate frame: at(x, y, {rotate, scale, sx, sy}, fn) */
@@ -274,9 +285,13 @@ export class Painter {
     const widthAt = Painter.profile(width, { taper, pressure });
     const ws = r.pts.map((_, i) => widthAt(i / (n - 1)));
     const L = r.length;
+    // streak/dry lanes are smooth, so they only need a vertex every ~5px
+    const stride = Math.max(1, Math.round(5 / (L / (n - 1) || 1)));
     const lane = (u, from = 0, to = 1) => {
       const pts = [];
-      for (let i = Math.floor(from * (n - 1)); i <= Math.ceil(to * (n - 1)); i++) {
+      const i0 = Math.floor(from * (n - 1)), i1 = Math.ceil(to * (n - 1));
+      for (let j = i0; j <= i1 + stride - 1; j += stride) {
+        const i = Math.min(j, i1);
         const o = u * ws[i];
         pts.push([r.pts[i][0] + nr[i][0] * o, r.pts[i][1] + nr[i][1] * o]);
       }
@@ -310,17 +325,27 @@ export class Painter {
       polyPath(ctx, [...left, ...cap(r.pts[n - 1], nr[n - 1], ws[n - 1] / 2), ...right.reverse(), ...cap(r.pts[0], [-nr[0][0], -nr[0][1]], ws[0] / 2)]);
       ctx.closePath();
       ctx.fill();
-      // 2. streaks — lighter/darker strands that stay inside the body
+      // 2. streaks — lighter/darker strands that stay inside the body.
+      //    Four color/width variants per stroke, each drawn as a single path.
       if (streaks > 0) {
         ctx.globalCompositeOperation = 'source-atop';
         const ns = Math.max(3, Math.round((width / 2.2) * streaks));
+        const variants = [0, 1, 2, 3].map(() => ({
+          color: jitterColor(color, rng, { l: 0.09, c: 0.2, h: 5 }),
+          alpha: rng.range(0.15, 0.42),
+          w: Math.max(0.6, (width / ns) * rng.range(0.6, 2)),
+          path: new Path2D(),
+        }));
         for (let k = 0; k < ns; k++) {
-          const u = rng.range(-0.5, 0.5);
-          ctx.strokeStyle = jitterColor(color, rng, { l: 0.09, c: 0.2, h: 5 });
-          ctx.globalAlpha = rng.range(0.12, 0.4);
-          ctx.lineWidth = Math.max(0.6, (width / ns) * rng.range(0.6, 2));
-          const a = rng.range(0, 0.3), z = rng.range(0.6, 1);
-          ctx.beginPath(); polyPath(ctx, lane(u, a, z)); ctx.stroke();
+          const v = variants[k % 4];
+          const pts = lane(rng.range(-0.5, 0.5), rng.range(0, 0.3), rng.range(0.6, 1));
+          pts.forEach(([x, y], i) => (i ? v.path.lineTo(x, y) : v.path.moveTo(x, y)));
+        }
+        for (const v of variants) {
+          ctx.strokeStyle = v.color;
+          ctx.globalAlpha = v.alpha;
+          ctx.lineWidth = v.w;
+          ctx.stroke(v.path);
         }
       }
       // 3. dry brush — erase gaps along lanes; more at the edges and toward the end
@@ -328,24 +353,28 @@ export class Painter {
         ctx.globalCompositeOperation = 'destination-out';
         ctx.globalAlpha = 1;
         const nl = Math.max(6, Math.round(width / 0.9));
+        // lanes are batched into a few width classes: one stroke() call per class
+        const classes = [0.3, 0.5, 0.7].map((k) => ({ w: Math.max(0.5, (width / nl) * k), path: new Path2D() }));
         for (let k = 0; k < nl; k++) {
           const u = ((k + rng.range(0, 1)) / nl - 0.5) * 1.04;
           const edge = Math.abs(u) * 2;
-          ctx.lineWidth = Math.max(0.5, (width / nl) * rng.range(0.25, 0.8));
+          const path = classes[k % 3].path;
           const pts = lane(u);
           const lo = rng.range(0, 999);
-          ctx.beginPath();
           let pen = false;
+          let g = 0;
+          const every = Math.max(1, Math.round(6 / (L / pts.length || 1)));
           for (let i = 0; i < pts.length; i++) {
             const t = i / (pts.length - 1);
-            const g = rng.noise2(lo, (t * L) / 160) * 0.7 + rng.noise2(lo + 7, (t * L) / 45) * 0.3;
+            // the gap pattern varies slowly (tens of px), so sample it every ~6px
+            if (i % every === 0) g = rng.noise2(lo, (t * L) / 160) * 0.7 + rng.noise2(lo + 7, (t * L) / 45) * 0.3;
             // threshold falls with dryness, edge-ness and distance along the stroke
             const th = 1 - dry * (0.5 + 0.9 * edge * edge + 1.4 * t * t);
-            if (g > th) { if (!pen) { ctx.moveTo(...pts[i]); pen = true; } else ctx.lineTo(...pts[i]); }
+            if (g > th) { if (!pen) { path.moveTo(...pts[i]); pen = true; } else path.lineTo(...pts[i]); }
             else pen = false;
           }
-          ctx.stroke();
         }
+        for (const c of classes) { ctx.lineWidth = c.w; ctx.stroke(c.path); }
       }
     }, { alpha, blend });
   }
@@ -557,6 +586,37 @@ export class Painter {
       const hx = b.cx + Math.cos(light) * r * 0.5, hy = b.cy + Math.sin(light) * r * 0.5;
       this.fill(new Shape(ellipsePts(hx, hy, Math.max(0.6, r * 0.22), Math.max(0.5, r * 0.15), light), true), `rgba(255,255,255,${highlight})`);
     }
+  }
+
+  /**
+   * A round dot, optionally out of focus. `blur` approximates a Gaussian-blurred
+   * disc with a radial gradient — far cheaper than glow() for stars, snow,
+   * bokeh and particles. opts: {blur, alpha, blend}
+   */
+  dot(x, y, r, color, { blur = 0, alpha: a = 1, blend } = {}) {
+    const c = css(color);
+    if (blur <= 0.3) return this.fill(circleShape(x, y, r), c, { alpha: a, blend });
+    const R = r + blur * 2.5;
+    const at = (d) => Math.max(0, Math.min(1, d / R));
+    const stops = [
+      [0, c],
+      [at(Math.max(0, r - blur)), c],
+      [at(r), alpha(c, 0.5)],
+      [at(r + blur), alpha(c, 0.16)],
+      [at(r + blur * 2), alpha(c, 0.03)],
+      [1, alpha(c, 0)],
+    ];
+    const ctx = this.ctx;
+    ctx.save();
+    ctx.globalAlpha *= a;
+    if (blend) ctx.globalCompositeOperation = blend;
+    const g = ctx.createRadialGradient(x, y, 0, x, y, R);
+    for (const [o, col] of stops) g.addColorStop(o, col);
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.arc(x, y, R, 0, TAU);
+    ctx.fill();
+    ctx.restore();
   }
 
   /** Soft glow: blurred copy of the shape(s). */
@@ -788,4 +848,12 @@ function ellipsePts(cx, cy, rx, ry, rot, n = 16) {
     pts.push([cx + x * c - y * s, cy + x * s + y * c]);
   }
   return pts;
+}
+
+
+function circleShape(cx, cy, r) {
+  const n = Math.max(8, Math.min(64, Math.ceil(r * 2)));
+  const pts = [];
+  for (let i = 0; i < n; i++) pts.push([cx + r * Math.cos((i / n) * TAU), cy + r * Math.sin((i / n) * TAU)]);
+  return new Shape(pts, true);
 }

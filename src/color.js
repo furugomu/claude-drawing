@@ -22,8 +22,34 @@ function lch(c) {
   return v;
 }
 
+// Fast OKLCH/OKLab -> sRGB for the common in-gamut case; culori's chroma
+// clamping (slow, but hue-preserving) only when a color falls out of gamut.
+const toLinear = (l, a, b) => {
+  const l_ = l + 0.3963377774 * a + 0.2158037573 * b;
+  const m_ = l - 0.1055613458 * a - 0.0638541728 * b;
+  const s_ = l - 0.0894841775 * a - 1.291485548 * b;
+  const L = l_ ** 3, M = m_ ** 3, S = s_ ** 3;
+  return [
+    4.0767416621 * L - 3.3077115913 * M + 0.2309699292 * S,
+    -1.2684380046 * L + 2.6097574011 * M - 0.3413193965 * S,
+    -0.0041960863 * L - 0.7034186147 * M + 1.707614701 * S,
+  ];
+};
+const gamma = (x) => (x <= 0.0031308 ? 12.92 * x : 1.055 * x ** (1 / 2.4) - 0.055);
 function out(c) {
-  return formatRgb(clampChroma(c, 'oklch'));
+  let l, a, b;
+  if (c.mode === 'oklch') {
+    const h = ((c.h || 0) * Math.PI) / 180;
+    l = c.l; a = c.c * Math.cos(h); b = c.c * Math.sin(h);
+  } else if (c.mode === 'oklab') {
+    l = c.l; a = c.a; b = c.b;
+  } else return formatRgb(clampChroma(c, 'oklch'));
+  const lin = toLinear(l, a, b);
+  const eps = 1e-4;
+  if (lin.some((v) => v < -eps || v > 1 + eps)) return formatRgb(clampChroma(c, 'oklch'));
+  const [r, g, bl] = lin.map((v) => Math.round(Math.max(0, Math.min(1, gamma(v))) * 255));
+  const al = c.alpha ?? 1;
+  return al >= 1 ? `rgb(${r}, ${g}, ${bl})` : `rgba(${r}, ${g}, ${bl}, ${Math.round(al * 1000) / 1000})`;
 }
 
 /** Build a color from OKLCH: l 0..1, c 0..0.37, h degrees. */

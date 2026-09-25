@@ -31,7 +31,7 @@ export default function (t) {
     p.fill(rect(-10, top - 14, W + 20, 16), '#2e2c3b');
     snowcap(p, rect(-10, top - 14, W + 20, 16), 22);
     // a bare branch leaning over the fence, forking into twigs
-    p.branch(-30, 360, 0.42, 300, 16, { depth: 4, color: '#0d1020', lift: 0 });
+    p.scope('branch1', () => p.branch(-30, 360, 0.42, 300, 16, { depth: 4, color: '#0d1020', lift: 0 }));
   });
 
   // ---- the stall ---------------------------------------------------------------
@@ -196,8 +196,8 @@ export default function (t) {
       const x = p.rng.range(0, W), y = p.rng.range(0, H);
       const r = 1 + depth * 9;
       const c = mix('#c9d3ea', '#ffffff', depth);
-      if (depth > 0.55) p.glow(circle(x, y, r), c, r * 0.8, { alpha: 0.5, blend: 'source-over' });
-      else p.fill(circle(x, y, r), alpha(c, 0.55 + depth * 0.4));
+      if (depth > 0.55) p.dot(x, y, r, c, { blur: r * 0.8, alpha: 0.5 });
+      else p.dot(x, y, r, c, { alpha: 0.55 + depth * 0.4 });
     }
   });
 

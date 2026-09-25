@@ -1,0 +1,26 @@
+// Timing for the stroke-filling pipeline: node bench/strokes.js
+import { createCanvas } from '@napi-rs/canvas';
+import { Painter } from '../src/painter.js';
+import { makeRng } from '../src/random.js';
+import { rect, curve, poisson } from '../src/geom.js';
+import { trace } from '../src/field.js';
+const env = { W: 1600, H: 1000, scale: 1, seed: 1, marks: [], guides: [], layers: [] };
+const p = new Painter(createCanvas(1600, 1000), env, makeRng(1));
+const time = (label, fn) => { const t0 = performance.now(); fn(); console.log(label.padEnd(28), (performance.now() - t0).toFixed(0) + 'ms'); };
+const area = rect(0, 0, 1600, 600);
+let seeds;
+time('poisson (17px)', () => { seeds = poisson(area, 17, { rng: p.rng }); });
+console.log('  seeds:', seeds.length);
+time('contains filter', () => seeds.filter(([x, y]) => area.contains(x, y)));
+let paths;
+time('trace paths', () => { paths = seeds.map(([x, y]) => trace(() => 0.03, x, y, { length: 140, step: 3 })); });
+time('brush x' + paths.length, () => { for (const s of paths) p.brush(s, { width: 20, color: '#556', dry: 0.35, alpha: 0.6 }); });
+time('brush dry=0 x' + paths.length, () => { for (const s of paths) p.brush(s, { width: 20, color: '#556', dry: 0, alpha: 0.6 }); });
+time('brush streaks=0,dry=0', () => { for (const s of paths) p.brush(s, { width: 20, color: '#556', dry: 0, streaks: 0, alpha: 0.6 }); });
+time('ink x' + paths.length, () => { for (const s of paths) p.ink(s, { width: 20, color: '#556' }); });
+time('createCanvas 200x60 x' + paths.length, () => { for (const s of paths) createCanvas(200, 60); });
+const { jitter, css } = await import('../src/color.js');
+time('jitter x20000', () => { for (let i = 0; i < 20000; i++) jitter('#556677', p.rng); });
+const c = createCanvas(300, 100), x = c.getContext('2d');
+time('strokeStyle set x20000', () => { for (let i = 0; i < 20000; i++) x.strokeStyle = `rgb(${i % 255}, 80, 90)`; });
+time('short stroke x20000', () => { for (let i = 0; i < 20000; i++) { x.beginPath(); x.moveTo(0, 50); for (let k = 1; k < 60; k++) x.lineTo(k * 5, 50 + (k % 3)); x.stroke(); } });

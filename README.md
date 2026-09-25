@@ -83,7 +83,8 @@ export default function (t) {
 | `strokes(shape, {angle \| fn, colors, width, length, tool})` | **領域を筆致で埋める**。colors にグラデーションを渡すとその場の色を拾う |
 | `fillPainted(shape, paint, opts)` | 塗り＋同じ色の筆致（ベタ塗りを絵にする一発技） |
 | `hatch(shape, {angle, spacing, cross})` | ハッチング |
-| `glow(shapes, color, radius)` | 発光 |
+| `glow(shapes, color, radius)` | 発光（任意の形。ぼかしフィルタなので重い） |
+| `dot(x, y, r, color, {blur})` | 丸い点・ぼけた点。星・雪・粒子はこちら（glow の約100倍速い） |
 | `raster(fn(x,y)→[r,g,b,a], {bounds, res})` | 手続き的な場（天の川・湯気・霧） |
 | `reflect(layers, {axis, ripple, fade})` | 水面反射 |
 | `illuminate(x, y, r, color, {blend})` | 点光源。**既に描いたものにだけ**当たる（空間は暗いまま） |
@@ -92,6 +93,7 @@ export default function (t) {
 | `branch(x, y, angle, len, width, {depth})` | 再帰的な枝。先端の点を返す |
 | `vignette(strength, {cx, cy})` / `grain(amt)` / `paper()` | 仕上げ |
 | `group(opts, fn)` / `clip(shape, fn)` / `at(x, y, {rotate, scale}, fn)` / `with(opts, fn)` | 合成・マスク・ローカル座標 |
+| `scope(name, fn)` | その中だけ独立した乱数。前に描いたものや道具の変更に影響されない |
 | `text(str, x, y, {size, font, align})` | `font: 'IPAGothic'` で日本語 |
 | `mark(name, x, y)` / `guide(shape, label)` | `--debug` 時だけ見える目印 |
 
@@ -109,3 +111,5 @@ export default function (t) {
 7. **光は足し算**。発光・照明は `screen` より `lighter`（加算）の方が「当たっている」感じが出る。
 8. **見えない参照レイヤー**。`t.layer('city', { alpha: 0 }, ...)` で描いておけば、画面には出さずに `lens` や `reflect` の元にできる。
 9. **おかしいと思ったら `--only` / `--skip` で切り分け**。スキップしたレイヤーは空の Painter を返すので依存レイヤーも動く。
+10. **気に入った偶然は `scope` で守る**。同じレイヤー内の乱数は前の描画に依存するので、枝ぶりなど形が大事な要素は `p.scope('名前', ...)` で囲う。名前を変えると別の形を試せる。
+11. **速度は `node bench/strokes.js` で測る**。筆の重さは「ストローク呼び出しの頂点数」でほぼ決まる。
