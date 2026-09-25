@@ -1,0 +1,298 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>小さな灯り — Claude の絵</title>
+<meta name="description" content="Claude が自分用の描画ツールを作りながら描いた絵。大きな暗がりの中の小さな暖かい灯り。">
+<meta property="og:title" content="小さな灯り — Claude の絵">
+<meta property="og:description" content="Claude が自分用の描画ツールを作りながら描いた絵。">
+<meta property="og:image" content="https://furugomu.github.io/claude-drawing/img/og.jpg">
+<meta property="og:type" content="website">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=M+PLUS+1+Code:wght@400;500&family=Shippori+Mincho+B1:wght@500;700&family=Zen+Kaku+Gothic+New:wght@400;500&display=swap" rel="stylesheet">
+<script>document.documentElement.classList.add('js');</script>
+<style>
+  :root {
+    --night: #0b0e1a;   /* the sky over the viaduct */
+    --indigo: #161b2f;  /* the noren */
+    --lamp: #ffcf80;    /* a lit window */
+    --ember: #ff8a50;   /* the red lantern's glow */
+    --snow: #ebe6db;    /* text */
+    --mist: #8d93ab;    /* quiet text */
+    --display: 'Shippori Mincho B1', 'Hiragino Mincho ProN', 'Yu Mincho', serif;
+    --body: 'Zen Kaku Gothic New', 'Hiragino Sans', 'Yu Gothic', sans-serif;
+    --code: 'M PLUS 1 Code', ui-monospace, 'SFMono-Regular', monospace;
+    color-scheme: dark;
+  }
+  @property --r { syntax: '<percentage>'; inherits: false; initial-value: 100%; }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--night);
+    color: var(--snow);
+    font: 400 1rem/1.9 var(--body);
+    letter-spacing: 0.02em;
+    -webkit-font-smoothing: antialiased;
+  }
+  a { color: inherit; text-decoration-color: color-mix(in srgb, var(--lamp) 50%, transparent); text-underline-offset: 0.25em; }
+  a:hover { color: var(--lamp); }
+  a:focus-visible { outline: 2px solid var(--lamp); outline-offset: 4px; border-radius: 2px; }
+  code, .mono { font-family: var(--code); font-size: 0.86em; letter-spacing: 0; }
+  .wrap { width: min(1200px, 100% - 2 * clamp(16px, 5vw, 48px)); margin-inline: auto; }
+
+  /* ---- hero: darkness, one small light, a vertical title -------------------------- */
+  .hero {
+    min-height: 100svh;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: center;
+    gap: clamp(24px, 6vw, 96px);
+    padding-block: 12vh;
+    position: relative;
+  }
+  .hero h1 {
+    writing-mode: vertical-rl;
+    font: 700 clamp(3.2rem, 9vw, 7.5rem)/1 var(--display);
+    letter-spacing: 0.18em;
+    margin: 0;
+    grid-column: 2;
+    grid-row: 1;
+  }
+  .hero h1 small {
+    display: block;
+    font: 500 clamp(0.8rem, 1.6vw, 1rem)/1 var(--display);
+    letter-spacing: 0.4em;
+    color: var(--mist);
+    margin-inline-start: 0.9em;
+  }
+  .lede { grid-column: 1; grid-row: 1; max-width: 30em; align-self: end; }
+  .lede p { margin: 0 0 1em; color: var(--mist); }
+  .lede p:first-child { color: var(--snow); font-size: 1.1rem; }
+  .spark {
+    position: absolute;
+    left: 38%;
+    top: 34%;
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: #fff3d6;
+    box-shadow: 0 0 10px 3px var(--lamp), 0 0 60px 18px color-mix(in srgb, var(--ember) 35%, transparent);
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .spark { animation: flicker 5s ease-in-out infinite; }
+    @keyframes flicker {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      37% { opacity: 0.82; transform: scale(0.92); }
+      41% { opacity: 1; transform: scale(1.04); }
+      70% { opacity: 0.9; }
+    }
+  }
+
+  /* ---- the pieces ---------------------------------------------------------------------- */
+  .piece { padding-block: clamp(56px, 12vh, 140px); }
+  .frame { display: block; position: relative; }
+  .frame img { display: block; width: 100%; height: auto; background: #05070e; }
+  .tall .frame { width: min(100%, 640px); margin-inline: auto; }
+  .meta {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.5fr);
+    gap: 12px clamp(24px, 5vw, 72px);
+    margin-top: 28px;
+  }
+  .tall .meta { width: min(100%, 640px); margin-inline: auto; grid-template-columns: 1fr; }
+  .no { font-family: var(--code); color: var(--mist); font-size: 0.8rem; margin: 0 0 4px; letter-spacing: 0.08em; }
+  .piece h2 { font: 700 clamp(1.5rem, 3vw, 2.1rem)/1.35 var(--display); margin: 0; letter-spacing: 0.08em; }
+  .caption p { margin: 0 0 0.9em; }
+  .light { font-family: var(--code); font-size: 0.82rem; color: var(--mist); margin: 0; }
+  .light b { color: var(--lamp); font-weight: 500; }
+  .light a { margin-inline-start: 1.2em; }
+
+  /* each painting is revealed by its own light, spreading from the light's real coordinates */
+  @media (prefers-reduced-motion: no-preference) {
+    .js .piece .frame img {
+      --r: -22%;
+      -webkit-mask-image: radial-gradient(circle farthest-corner at var(--lx) var(--ly), #000 var(--r), transparent calc(var(--r) + 22%));
+      mask-image: radial-gradient(circle farthest-corner at var(--lx) var(--ly), #000 var(--r), transparent calc(var(--r) + 22%));
+      transition: --r 3.2s cubic-bezier(0.35, 0.05, 0.2, 1);
+    }
+    .js .piece.lit .frame img { --r: 100%; }
+    .js .piece .frame::after {
+      content: '';
+      position: absolute;
+      left: var(--lx); top: var(--ly);
+      width: 9px; height: 9px; margin: -4.5px;
+      border-radius: 50%;
+      background: #fff6de;
+      box-shadow: 0 0 10px 3px var(--lamp), 0 0 48px 14px color-mix(in srgb, var(--ember) 40%, transparent);
+      transition: opacity 1.6s ease 1.4s;
+    }
+    .js .piece.lit .frame::after { opacity: 0; }
+  }
+
+  /* ---- how they were made --------------------------------------------------------------- */
+  .making { border-top: 1px solid color-mix(in srgb, var(--mist) 25%, transparent); padding-block: clamp(64px, 12vh, 140px); }
+  .making h2 { font: 700 clamp(1.5rem, 3vw, 2.1rem)/1.35 var(--display); margin: 0 0 24px; letter-spacing: 0.08em; }
+  .making > p { max-width: 38em; }
+  .loop { font-family: var(--code); color: var(--lamp); font-size: 0.95rem; letter-spacing: 0.05em; }
+  .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 40px 0 16px; }
+  .pair figure, .figure { margin: 0; }
+  .pair img, .figure img { display: block; width: 100%; height: auto; }
+  figcaption { font-size: 0.85rem; color: var(--mist); margin-top: 8px; }
+  .figure { margin-top: 56px; max-width: 760px; }
+  .making h3 { font: 500 1.15rem/1.5 var(--display); margin: 72px 0 8px; letter-spacing: 0.06em; }
+  .lessons { margin: 0; display: grid; gap: 0; max-width: 820px; }
+  .lessons div {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr);
+    gap: 8px 24px;
+    padding: 14px 0;
+    border-bottom: 1px solid color-mix(in srgb, var(--mist) 18%, transparent);
+  }
+  .lessons dt { color: var(--mist); }
+  .lessons dd { margin: 0; }
+  .lessons dd code { color: var(--lamp); }
+
+  footer { padding-block: 48px 72px; color: var(--mist); font-size: 0.85rem; }
+
+  @media (max-width: 720px) {
+    .hero { grid-template-columns: 1fr; grid-template-rows: auto auto; align-content: center; }
+    .hero h1 { grid-column: 1; grid-row: 1; justify-self: end; }
+    .lede { grid-row: 2; }
+    .spark { left: 22%; top: 24%; }
+    .meta, .lessons div { grid-template-columns: 1fr; }
+    .pair { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<header class="wrap hero">
+  <h1>小さな灯り<small>Claude の絵</small></h1>
+  <span class="spark" aria-hidden="true"></span>
+  <div class="lede">
+    <p>Claude が自分用の描画ツールを作りながら描いた絵。</p>
+    <p>画像を生成する機能は持っていないので、形の座標と筆の置き方をコードに書き、実行して、できた画像を見て直す。それを繰り返すうちに、描きたいのは「大きな暗がりの中の小さな暖かい灯り」だと分かった。</p>
+  </div>
+</header>
+
+<main>
+  <article class="wrap piece" style="--lx: 78.44%; --ly: 32.4%">
+    <a class="frame" href="https://raw.githubusercontent.com/furugomu/claude-drawing/main/gallery/001-lighthouse.png" aria-label="灯台、ブルーアワー（原寸の画像を開く）">
+      <img src="img/001-lighthouse.webp" width="1600" height="1000" alt="日没後の空の下、崖の上の紅白の灯台が海へ光の帯を投げている。隣に窓の灯った小屋。">
+    </a>
+    <div class="meta">
+      <div><p class="no">No.001</p><h2>灯台、ブルーアワー</h2></div>
+      <div class="caption">
+        <p>最初の一枚。はじめはベタ塗りのイラストで、雲は四角く、崖には雨のような点々が散っていた。面を筆致で埋める道具と、光の方を向いた輪郭を選ぶ道具を作って描き直した。</p>
+        <p class="light"><b>灯り</b> lamp (1255, 324)<a href="https://github.com/furugomu/claude-drawing/blob/main/works/001-lighthouse.js">コード</a></p>
+      </div>
+    </div>
+  </article>
+
+  <article class="wrap piece" style="--lx: 69.38%; --ly: 53.4%">
+    <a class="frame" href="https://raw.githubusercontent.com/furugomu/claude-drawing/main/gallery/003-night-train.png" aria-label="夜汽車（原寸の画像を開く）">
+      <img src="img/003-night-train.webp" width="1600" height="1000" alt="天の川の下、窓の灯った列車が湖の上の石のアーチ橋を渡り、丘のトンネルへ向かう。湖面にすべてが映っている。" loading="lazy">
+    </a>
+    <div class="meta">
+      <div><p class="no">No.003</p><h2>夜汽車</h2></div>
+      <div class="caption">
+        <p>『銀河鉄道の夜』へのオマージュ。天の川は、帯に沿った座標系で明るさと暗黒帯を計算して描いた。星も同じ明るさに従って置くので、ひとりでに天の川に集まる。</p>
+        <p class="light"><b>灯り</b> headlight (1110, 534)<a href="https://github.com/furugomu/claude-drawing/blob/main/works/003-night-train.js">コード</a></p>
+      </div>
+    </div>
+  </article>
+
+  <article class="wrap piece tall" style="--lx: 82.08%; --ly: 50.67%">
+    <a class="frame" href="https://raw.githubusercontent.com/furugomu/claude-drawing/main/gallery/004-yatai.png" aria-label="雪の夜の屋台（原寸の画像を開く）">
+      <img src="img/004-yatai.webp" width="1200" height="1500" alt="雪の降る夜、「おでん」の暖簾と赤提灯のかかった屋台。黒猫が雪の上に座って提灯を見上げている。" loading="lazy">
+    </a>
+    <div class="meta">
+      <div><p class="no">No.004</p><h2>雪の夜の屋台</h2></div>
+      <div class="caption">
+        <p>初めて描いた生き物。頭と胴をひとつの形にしたら首が溶けてボウリングのピンになったので、部品に分けた。上を向いた縁を選んで帯にすると、屋根にも椅子にも提灯にも雪が積もった。</p>
+        <p class="light"><b>灯り</b> lantern (985, 760)<a href="https://github.com/furugomu/claude-drawing/blob/main/works/004-yatai.js">コード</a></p>
+      </div>
+    </div>
+  </article>
+
+  <article class="wrap piece" style="--lx: 29.38%; --ly: 26.2%">
+    <a class="frame" href="https://raw.githubusercontent.com/furugomu/claude-drawing/main/gallery/005-anglerfish.png" aria-label="チョウチンアンコウ（原寸の画像を開く）">
+      <img src="img/005-anglerfish.webp" width="1600" height="1000" alt="深海の暗闇で、チョウチンアンコウの頭の先の発光器が青緑に光り、大きく開いた牙の口と小魚たちを照らしている。" loading="lazy">
+    </a>
+    <div class="meta">
+      <div><p class="no">No.005</p><h2>チョウチンアンコウ</h2></div>
+      <div class="caption">
+        <p>自分で灯りを持つ生き物。最初は全身に光が当たって、青緑の風船になった。深海魚はほとんど黒く、灯りの近くだけが見える。光を加算で重ね、近いほど強く当たるようにした。</p>
+        <p class="light"><b>灯り</b> esca (470, 262)<a href="https://github.com/furugomu/claude-drawing/blob/main/works/005-anglerfish.js">コード</a></p>
+      </div>
+    </div>
+  </article>
+
+  <article class="wrap piece" style="--lx: 75.94%; --ly: 74.6%">
+    <a class="frame" href="https://raw.githubusercontent.com/furugomu/claude-drawing/main/gallery/006-rain-window.png" aria-label="雨の夜の窓辺（原寸の画像を開く）">
+      <img src="img/006-rain-window.webp" width="1600" height="1000" alt="雨粒のついた夜の窓。外の街の灯りは丸くぼけ、窓辺にはマグカップと瓶に入った蝋燭が灯っている。" loading="lazy">
+    </a>
+    <div class="meta">
+      <div><p class="no">No.006</p><h2>雨の夜の窓辺</h2></div>
+      <div class="caption">
+        <p>窓の水滴は小さなレンズで、外の街を逆さに映す。最初は黒いキャビアのようになった。水滴は周りの光も通すので、ぼけた街を下地にして、くっきりした逆さの像を重ねた。</p>
+        <p class="light"><b>灯り</b> flame (1215, 746)<a href="https://github.com/furugomu/claude-drawing/blob/main/works/006-rain-window.js">コード</a></p>
+      </div>
+    </div>
+  </article>
+
+  <section class="wrap making" aria-labelledby="making">
+    <h2 id="making">どうやって描いているか</h2>
+    <p>絵は JavaScript のファイル 1 つで、形・筆致・光の置き方を座標で書いてある。それを自作の描画ツール（Node と Skia）で PNG にして、画像として見る。</p>
+    <p class="loop">書く → 描き出す → 見る → 直す</p>
+    <p>「見る」ための道具も作った。座標グリッド付きの拡大図と、明暗だけにした図と、小さなサムネイル。赤提灯は色では目立っていたのに、明暗だけにすると背景に埋もれていて、それで直せた。</p>
+
+    <div class="pair">
+      <figure>
+        <img src="img/001-lighthouse-v1.webp" width="1600" height="1000" alt="灯台の最初の版。雲が四角く、崖は平らな影に点々が散っている。" loading="lazy">
+        <figcaption>灯台の最初の版</figcaption>
+      </figure>
+      <figure>
+        <img src="img/001-lighthouse.webp" width="1600" height="1000" alt="灯台の描き直した版。空も海も崖も筆致で塗られている。" loading="lazy">
+        <figcaption>描き直した版</figcaption>
+      </figure>
+    </div>
+
+    <figure class="figure">
+      <img src="img/004-yatai-look.webp" width="1502" height="1403" alt="屋台の絵と、その明暗図・5階調の図・サムネイルを並べた確認用の画像。" loading="lazy">
+      <figcaption>確認用の画像。右に明暗、5 階調、サムネイル</figcaption>
+    </figure>
+
+    <h3>失敗から生まれた道具</h3>
+    <dl class="lessons">
+      <div><dt>雲が四角い</dt><dd><code>blobUnion</code> — 円を溶かし合わせて、雲や岩や猫の胴を作る</dd></div>
+      <div><dt>縁の光が違う場所に出る</dt><dd><code>facing()</code> — 光の方を向いている輪郭を選ぶ。上に向ければ雪が積もる</dd></div>
+      <div><dt>天の川が綿あめになる</dt><dd><code>raster</code> — 座標ごとに色を計算する、霧や星雲のための塗り</dd></div>
+      <div><dt>猫の首が溶ける</dt><dd>部品を分けて重ね、<code>facing({ exclude })</code> で隠れた輪郭を除く</dd></div>
+      <div><dt>アンコウが風船になる</dt><dd><code>illuminate</code> — 描いたものにだけ当たる点光源</dd></div>
+      <div><dt>水滴が黒いキャビアになる</dt><dd><code>lens</code> — 背後を逆さに映し、周りの光も通す水滴</dd></div>
+    </dl>
+  </section>
+</main>
+
+<footer class="wrap">
+  <p>道具と絵のコード: <a href="https://github.com/furugomu/claude-drawing">github.com/furugomu/claude-drawing</a>　·　制作日誌は <a href="https://github.com/furugomu/claude-drawing/blob/main/JOURNAL.md">JOURNAL.md</a></p>
+</footer>
+
+<script>
+  const pieces = document.querySelectorAll('.piece');
+  const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (still || !('IntersectionObserver' in window)) {
+    pieces.forEach((p) => p.classList.add('lit'));
+  } else {
+    const io = new IntersectionObserver((entries) => {
+      for (const e of entries) if (e.isIntersecting) { e.target.classList.add('lit'); io.unobserve(e.target); }
+    }, { threshold: 0.35 });
+    pieces.forEach((p) => io.observe(p));
+  }
+</script>
+</body>
+</html>

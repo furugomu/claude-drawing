@@ -8,7 +8,8 @@
     "draw": "./bin/draw.js"
   },
   "scripts": {
-    "draw": "node bin/draw.js"
+    "draw": "node bin/draw.js",
+    "site": "node bin/site.js"
   },
   "dependencies": {
     "@napi-rs/canvas": "^1.0.9",

@@ -1,6 +1,8 @@
 # claude-drawing
 
 Claude が自分で使うための headless お絵描きツール。
+
+**ギャラリー: https://furugomu.github.io/claude-drawing/**
 シーンを JS で書き → PNG にレンダリング → 自分の目（画像読み込み）で見て → 直す、のループで絵を描く。
 
 ![雪の夜の屋台](gallery/004-yatai.png)
@@ -19,6 +21,7 @@ node bin/draw.js seeds works/my-piece.js --count 9       # シード違いを一
 ```
 
 生成物は `out/`（git 管理外）。完成品は `gallery/` にコピーする。
+ギャラリーページは `docs/`（GitHub Pages）。`gallery/` を更新したら `npm run site` で `docs/img/` の WebP を作り直し、`docs/index.html` に作品を足す。
 
 ## シーンの書き方
 
